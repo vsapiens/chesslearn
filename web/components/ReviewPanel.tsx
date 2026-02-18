@@ -120,7 +120,7 @@ export function ReviewPanel({
               <button
                 key={pos.id}
                 onClick={() => onSelectPly?.(pos.ply)}
-                className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-all hover:bg-zinc-800 ${
+                className={`w-full flex items-center gap-2 px-2 py-2 sm:py-1 min-h-[36px] rounded text-xs transition-all hover:bg-zinc-800 ${
                   currentPly === pos.ply ? "bg-zinc-700" : ""
                 }`}
               >

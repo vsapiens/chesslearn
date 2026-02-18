@@ -124,6 +124,86 @@ chmod +x start-dev.sh
 - **Mistake**: > 100 cp drop
 - **Inaccuracy**: > 50 cp drop
 
+## Deployment
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose v2+
+- (Optional) `make` for shorthand commands
+
+### Quick Start with Docker
+
+```bash
+# Build and start both services
+make dev
+# — or without make —
+docker compose up --build
+```
+
+The server runs on `http://localhost:3001` and the web frontend on `http://localhost:3000`.
+
+### Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make dev` | Build images and start in foreground |
+| `make build` | Build images only |
+| `make up` | Start containers in background |
+| `make down` | Stop all containers |
+| `make logs` | Tail container logs |
+| `make db-push` | Apply Prisma schema to the database |
+| `make clean` | Stop containers and remove volumes |
+| `make prod` | Build and start with `.env.production` |
+
+### Production Deployment
+
+1. **Configure environment** — copy and edit the production template:
+
+```bash
+cp .env.production.example .env.production
+```
+
+Set `FRONTEND_URL`, `NEXT_PUBLIC_API_URL`, and `NEXT_PUBLIC_WS_URL` to your actual domain. `NEXT_PUBLIC_*` variables are baked into the Next.js bundle at build time.
+
+2. **Build and run**:
+
+```bash
+make prod
+# — or —
+docker compose --env-file .env.production build
+docker compose --env-file .env.production up -d
+```
+
+3. **Reverse proxy (optional)** — an Nginx config is provided in `nginx/nginx.conf`. Replace `your-domain.com` and the TLS certificate paths, then run Nginx in front of the Docker services to handle HTTPS and route traffic.
+
+### VPS Deployment (DigitalOcean, Hetzner, Linode, etc.)
+
+```bash
+# On the server
+git clone <your-repo-url> chesslearn
+cd chesslearn
+cp .env.production.example .env.production
+# Edit .env.production with your domain and settings
+make prod
+```
+
+SQLite data is persisted in the `chess-data` Docker volume. To back up:
+
+```bash
+docker compose exec server cp /data/chess.db /data/chess-backup.db
+docker cp "$(docker compose ps -q server)":/data/chess-backup.db ./backup.db
+```
+
+### Platform-Specific Notes
+
+**Railway / Render** — Deploy each directory (`server/` and `web/`) as a separate service. Set the environment variables from `.env.production.example` in the platform dashboard. Railway supports persistent volumes for SQLite; on Render, attach a disk to the server service mounted at `/data`.
+
+**Fly.io** — Use `fly launch` in each directory. Add a persistent volume for the server (`fly volumes create chess_data`) and mount it at `/data`. Set `NEXT_PUBLIC_*` build args in the web service's `fly.toml`.
+
+### Database Considerations
+
+SQLite works well for single-server deployments. If you need horizontal scaling (multiple server instances), migrate to PostgreSQL by updating the Prisma schema `datasource` provider and `DATABASE_URL`.
+
 ## License
 
 MIT

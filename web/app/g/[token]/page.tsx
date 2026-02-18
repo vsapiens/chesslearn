@@ -324,12 +324,12 @@ export default function GameRoomPage() {
             <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-lg">
               <p className="text-xs text-zinc-400 mb-2">Share to invite opponent:</p>
               <div className="flex gap-2">
-                <code className="flex-1 text-xs bg-zinc-800 px-2 py-1.5 rounded text-zinc-300 truncate">
+                <code className="flex-1 text-xs bg-zinc-800 px-2 py-1.5 rounded text-zinc-300 truncate break-all">
                   {typeof window !== "undefined" ? window.location.href : ""}
                 </code>
                 <button
                   onClick={copyLink}
-                  className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-black text-xs font-medium rounded transition-colors whitespace-nowrap"
+                  className="px-3 min-h-touch bg-amber-500 hover:bg-amber-400 text-black text-xs font-medium rounded transition-colors whitespace-nowrap"
                 >
                   {copyDone ? "Copied!" : "Copy"}
                 </button>
@@ -352,13 +352,13 @@ export default function GameRoomPage() {
                 onClick={requestHint}
                 disabled={hintsLeft <= 0}
                 title={`${hintsLeft} hints remaining`}
-                className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+                className="flex-1 py-2 min-h-touch bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
               >
                 Hint ({hintsLeft})
               </button>
               <button
                 onClick={resign}
-                className="flex-1 py-2 bg-zinc-800 hover:bg-red-900/40 border border-zinc-700 hover:border-red-700 rounded-lg text-sm text-zinc-300 hover:text-red-400 transition-colors"
+                className="flex-1 py-2 min-h-touch bg-zinc-800 hover:bg-red-900/40 border border-zinc-700 hover:border-red-700 rounded-lg text-sm text-zinc-300 hover:text-red-400 transition-colors"
               >
                 Resign
               </button>
@@ -372,13 +372,13 @@ export default function GameRoomPage() {
                 onClick={() => {
                   if (game.gameId) router.push(`/review/${game.gameId}`);
                 }}
-                className="py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg text-sm transition-colors"
+                className="py-2.5 min-h-touch bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg text-sm transition-colors"
               >
                 Review Game →
               </button>
               <a
                 href="/play/new"
-                className="block text-center py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+                className="block text-center py-2.5 min-h-touch bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
               >
                 New Game
               </a>

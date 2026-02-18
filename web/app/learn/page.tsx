@@ -1,8 +1,8 @@
 export default function LearnPage() {
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
-      <h1 className="text-3xl font-bold text-white mb-2">Learn & Improve</h1>
-      <p className="text-zinc-400 mb-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
+      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Learn & Improve</h1>
+      <p className="text-zinc-400 mb-8 sm:mb-10">
         Use every game as a learning opportunity. Here's how to get the most out of ChessLearn.
       </p>
 
@@ -34,16 +34,16 @@ export default function LearnPage() {
         />
       </div>
 
-      <div className="mt-12 flex gap-4">
+      <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <a
           href="/play/new?mode=bot"
-          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg text-sm transition-colors"
+          className="px-5 py-3 min-h-touch text-center bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg text-sm transition-colors"
         >
           Play a Bot Now
         </a>
         <a
           href="/play/new?mode=human"
-          className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+          className="px-5 py-3 min-h-touch text-center bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
         >
           Challenge a Friend
         </a>
@@ -62,7 +62,7 @@ function TipCard({
   body: string;
 }) {
   return (
-    <div className="flex gap-4 p-5 bg-zinc-900 border border-zinc-800 rounded-xl">
+    <div className="flex gap-3 sm:gap-4 p-4 sm:p-5 bg-zinc-900 border border-zinc-800 rounded-xl">
       <span className="text-2xl flex-shrink-0">{icon}</span>
       <div>
         <h2 className="font-semibold text-white mb-1">{title}</h2>

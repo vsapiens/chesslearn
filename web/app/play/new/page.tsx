@@ -44,8 +44,8 @@ export default function NewGamePage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-6 py-16">
-      <h1 className="text-3xl font-bold text-white mb-2">New Game</h1>
+    <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-16">
+      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">New Game</h1>
       <p className="text-zinc-400 mb-8">Configure your game settings below.</p>
 
       {/* Mode selection */}
@@ -58,7 +58,7 @@ export default function NewGamePage() {
             <button
               key={m}
               onClick={() => setMode(m)}
-              className={`py-3 rounded-lg border text-sm font-medium transition-all ${
+              className={`py-3 min-h-touch rounded-lg border text-sm font-medium transition-all ${
                 mode === m
                   ? "border-amber-400 bg-amber-400/10 text-amber-400"
                   : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
@@ -126,7 +126,7 @@ export default function NewGamePage() {
             <button
               key={tc || "none"}
               onClick={() => setTimeControl(tc)}
-              className={`px-3 py-1.5 rounded border text-sm transition-all ${
+              className={`px-4 py-2 min-h-touch rounded border text-sm transition-all ${
                 timeControl === tc
                   ? "border-amber-400 bg-amber-400/10 text-amber-400"
                   : "border-zinc-700 text-zinc-400 hover:border-zinc-500"

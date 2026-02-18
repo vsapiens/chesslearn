@@ -41,7 +41,7 @@ export function MoveList({ moves, currentPly, onSelectPly }: Props) {
   }
 
   return (
-    <div className="font-mono text-sm overflow-y-auto max-h-64 pr-1">
+    <div className="font-mono text-sm overflow-y-auto max-h-48 sm:max-h-64 pr-1">
       {rows.map((row) => (
         <div key={row.moveNum} className="flex items-center gap-1 py-0.5">
           <span className="text-zinc-600 w-7 text-right select-none">
@@ -50,7 +50,7 @@ export function MoveList({ moves, currentPly, onSelectPly }: Props) {
 
           {row.white && (
             <button
-              className={`move-item flex-1 text-left ${
+              className={`move-item flex-1 text-left min-h-[36px] flex items-center ${
                 currentPly === row.white.ply ? "active" : ""
               }`}
               onClick={() => onSelectPly?.(row.white!.ply)}
@@ -61,7 +61,7 @@ export function MoveList({ moves, currentPly, onSelectPly }: Props) {
 
           {row.black ? (
             <button
-              className={`move-item flex-1 text-left ${
+              className={`move-item flex-1 text-left min-h-[36px] flex items-center ${
                 currentPly === row.black.ply ? "active" : ""
               }`}
               onClick={() => onSelectPly?.(row.black!.ply)}

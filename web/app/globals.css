@@ -3,12 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --board-size: min(90vw, 560px);
+  --board-size: min(92vw, 560px);
 }
 
 body {
   @apply bg-zinc-950 text-zinc-100 antialiased;
   font-family: system-ui, -apple-system, sans-serif;
+}
+
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Chess board scrollbar */

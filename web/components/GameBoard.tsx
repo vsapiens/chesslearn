@@ -194,7 +194,7 @@ export function GameBoard({
                 <button
                   key={p.value}
                   onClick={() => confirmPromotion(p.value)}
-                  className="flex flex-col items-center gap-1 px-4 py-3 bg-zinc-800 hover:bg-amber-500/20 hover:border-amber-400 border border-zinc-700 rounded-lg transition-all"
+                  className="flex flex-col items-center gap-1 px-4 py-3 min-w-touch min-h-touch bg-zinc-800 hover:bg-amber-500/20 hover:border-amber-400 border border-zinc-700 rounded-lg transition-all"
                   title={p.name}
                 >
                   <span className="text-3xl">{p.label}</span>

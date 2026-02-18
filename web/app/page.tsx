@@ -2,20 +2,20 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
       {/* Hero */}
-      <div className="text-center mb-16">
-        <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
+      <div className="text-center mb-10 sm:mb-16">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
           Play. Challenge. <span className="text-amber-400">Improve.</span>
         </h1>
-        <p className="text-zinc-400 text-lg max-w-xl mx-auto">
+        <p className="text-zinc-400 text-base sm:text-lg max-w-xl mx-auto">
           Play chess against friends with a shareable link, or train against
           bots. Review every game with engine analysis.
         </p>
       </div>
 
       {/* Cards */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
         <GameCard
           href="/play/new?mode=human"
           icon="🔗"
@@ -43,7 +43,7 @@ export default function HomePage() {
       </div>
 
       {/* Features list */}
-      <div className="mt-16 grid md:grid-cols-2 gap-4 text-sm text-zinc-400">
+      <div className="mt-10 sm:mt-16 grid sm:grid-cols-2 gap-3 sm:gap-4 text-sm text-zinc-400">
         {[
           "Real-time moves over WebSocket",
           "Server-side move validation",
