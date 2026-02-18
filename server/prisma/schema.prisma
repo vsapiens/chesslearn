@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Game {
+  id            String   @id @default(cuid())
+  token         String   @unique
+  mode          String   // 'human' | 'bot'
+  status        String   @default("waiting") // 'waiting' | 'active' | 'finished'
+  result        String?  // 'white' | 'black' | 'draw'
+  resultReason  String?  // 'checkmate' | 'resign' | 'stalemate' | 'timeout'
+  timeControl   String?
+  whiteGuestId  String?
+  blackGuestId  String?
+  botDifficulty String?  // 'easy' | 'medium' | 'hard'
+  playerColor   String?  // color the human plays when vsBot: 'white' | 'black'
+  currentFen    String   @default("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+  pgn           String   @default("")
+  hintsUsed     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  moves         Move[]
+  review        Review?
+}
+
+model Move {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id])
+  ply       Int
+  san       String
+  uci       String
+  fenAfter  String
+  clockMs   Int?
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id              String           @id @default(cuid())
+  gameId          String           @unique
+  game            Game             @relation(fields: [gameId], references: [id])
+  analysisVersion String           @default("1")
+  summary         String?
+  accuracy        Float?
+  createdAt       DateTime         @default(now())
+  positions       ReviewPosition[]
+}
+
+model ReviewPosition {
+  id            String  @id @default(cuid())
+  reviewId      String
+  review        Review  @relation(fields: [reviewId], references: [id])
+  gameId        String
+  ply           Int
+  fen           String
+  evalBefore    Float?
+  evalAfter     Float?
+  category      String? // 'blunder' | 'mistake' | 'inaccuracy' | 'good' | 'best'
+  bestMoveUci   String?
+  playedMoveUci String?
+  playedMoveSan String?
+  explanation   String?
+}

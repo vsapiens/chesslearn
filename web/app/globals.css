@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --board-size: min(90vw, 560px);
+}
+
+body {
+  @apply bg-zinc-950 text-zinc-100 antialiased;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Chess board scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { @apply bg-zinc-900; }
+::-webkit-scrollbar-thumb { @apply bg-zinc-700 rounded; }
+
+.move-item {
+  @apply cursor-pointer rounded px-1 py-0.5 text-sm transition-colors;
+}
+.move-item:hover { @apply bg-zinc-700; }
+.move-item.active { @apply bg-amber-600 text-white; }
