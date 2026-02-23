@@ -1,20 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export default function NewGamePage() {
-  const params = useSearchParams();
   const router = useRouter();
 
-  const [mode, setMode] = useState<"human" | "bot">(
-    (params.get("mode") as "human" | "bot") ?? "human"
-  );
-  const [botDifficulty, setBotDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [colorPref, setColorPref] = useState<"white" | "black" | "random">("random");
-  const [timeControl, setTimeControl] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,10 +20,7 @@ export default function NewGamePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode,
-          botDifficulty: mode === "bot" ? botDifficulty : undefined,
           colorPreference: colorPref,
-          timeControl: timeControl || undefined,
         }),
       });
 
@@ -44,113 +35,60 @@ export default function NewGamePage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-16">
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">New Game</h1>
-      <p className="text-zinc-400 mb-8">Configure your game settings below.</p>
-
-      {/* Mode selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Game Mode
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          {(["human", "bot"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`py-3 min-h-touch rounded-lg border text-sm font-medium transition-all ${
-                mode === m
-                  ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              {m === "human" ? "🔗 vs Friend (Link)" : "🤖 vs Bot"}
-            </button>
-          ))}
-        </div>
+    <div className="max-w-md mx-auto px-4 sm:px-6 py-10 sm:py-20">
+      <div className="text-center mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+          New Game
+        </h1>
+        <p className="text-zinc-400 text-sm">
+          Choose your side and create an invite link to share with a friend.
+        </p>
       </div>
 
-      {/* Bot difficulty */}
-      {mode === "bot" && (
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Bot Difficulty
+      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-6">
+        {/* Color preference */}
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-3">
+            Play as
           </label>
           <div className="grid grid-cols-3 gap-3">
-            {(["easy", "medium", "hard"] as const).map((d) => (
+            {(["white", "random", "black"] as const).map((c) => (
               <button
-                key={d}
-                onClick={() => setBotDifficulty(d)}
-                className={`py-2 rounded-lg border text-sm font-medium transition-all ${
-                  botDifficulty === d
-                    ? "border-sky-400 bg-sky-400/10 text-sky-400"
-                    : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                key={c}
+                onClick={() => setColorPref(c)}
+                className={`py-3 rounded-xl border text-sm font-medium transition-all flex flex-col items-center gap-1.5 ${
+                  colorPref === c
+                    ? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-sm shadow-amber-500/10"
+                    : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300"
                 }`}
               >
-                {d.charAt(0).toUpperCase() + d.slice(1)}
+                <span className="text-xl">
+                  {c === "white" ? "\u2659" : c === "black" ? "\u265F" : "\u2696"}
+                </span>
+                <span>{c === "white" ? "White" : c === "black" ? "Black" : "Random"}</span>
               </button>
             ))}
           </div>
         </div>
-      )}
 
-      {/* Color preference */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Play as
-        </label>
-        <div className="grid grid-cols-3 gap-3">
-          {(["white", "random", "black"] as const).map((c) => (
-            <button
-              key={c}
-              onClick={() => setColorPref(c)}
-              className={`py-2 rounded-lg border text-sm font-medium transition-all ${
-                colorPref === c
-                  ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              {c === "white" ? "⬜ White" : c === "black" ? "⬛ Black" : "🎲 Random"}
-            </button>
-          ))}
-        </div>
+        {error && (
+          <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={createGame}
+          disabled={loading}
+          className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors text-base"
+        >
+          {loading ? "Creating game\u2026" : "Create Game & Get Link"}
+        </button>
+
+        <p className="text-xs text-zinc-500 text-center leading-relaxed">
+          You'll get a unique link to share. Your friend opens it and the game starts automatically.
+        </p>
       </div>
-
-      {/* Time control (optional) */}
-      <div className="mb-8">
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Time Control <span className="text-zinc-500">(optional)</span>
-        </label>
-        <div className="flex gap-2 flex-wrap">
-          {["", "3+0", "5+0", "10+0"].map((tc) => (
-            <button
-              key={tc || "none"}
-              onClick={() => setTimeControl(tc)}
-              className={`px-4 py-2 min-h-touch rounded border text-sm transition-all ${
-                timeControl === tc
-                  ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              {tc || "None"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded text-red-400 text-sm">
-          {error}
-        </div>
-      )}
-
-      <button
-        onClick={createGame}
-        disabled={loading}
-        className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-lg transition-colors"
-      >
-        {loading ? "Creating game…" : "Create Game"}
-      </button>
     </div>
   );
 }

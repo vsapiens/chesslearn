@@ -3,9 +3,9 @@ import { Nav } from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChessLearn — Play, Challenge, Improve",
+  title: "ChessLearn — Play Chess with Friends",
   description:
-    "Play chess vs friends with a shareable link or challenge a bot. Review your games with engine analysis.",
+    "Play chess with friends via a shareable link. No account needed. Real-time multiplayer with post-game analysis.",
 };
 
 export const viewport: Viewport = {

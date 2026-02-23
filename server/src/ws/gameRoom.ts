@@ -1,10 +1,9 @@
 /**
- * WebSocket game room.
+ * WebSocket game room — human vs human multiplayer.
  * One room per game token. Handles:
- * - Player join
+ * - Player join & color assignment
  * - Move validation + relay
- * - Bot moves
- * - Hints
+ * - Hints (engine-powered suggestions)
  * - Resign
  * - Reconnect
  */
@@ -13,7 +12,7 @@ import { WebSocket } from "@fastify/websocket";
 import { nanoid } from "nanoid";
 import { prisma } from "../db/client.js";
 import { validateAndApplyMove } from "../chess/validator.js";
-import { getBestMove, evaluateFen } from "../chess/engine.js";
+import { getBestMove } from "../chess/engine.js";
 import { Chess } from "chess.js";
 
 const MAX_HINTS = parseInt(process.env.MAX_HINTS_PER_GAME ?? "3", 10);
@@ -55,78 +54,6 @@ function send(ws: WebSocket, msg: object) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
-async function handleBotMove(token: string, fen: string): Promise<void> {
-  const game = await prisma.game.findUnique({
-    where: { token },
-    include: { moves: { orderBy: { ply: "asc" } } },
-  });
-
-  if (!game || game.status !== "active") return;
-
-  const difficulty = (game.botDifficulty as "easy" | "medium" | "hard") ?? "medium";
-
-  try {
-    const result = await getBestMove(fen, difficulty);
-    const bestMove = result.bestMove;
-
-    if (!bestMove || bestMove === "(none)") {
-      // Game over
-      return;
-    }
-
-    const from = bestMove.slice(0, 2);
-    const to = bestMove.slice(2, 4);
-    const promotion = bestMove.length === 5 ? bestMove[4] : undefined;
-
-    const moveResult = validateAndApplyMove(fen, from, to, promotion);
-    if (!moveResult.valid || !moveResult.fenAfter) return;
-
-    const ply = game.moves.length + 1;
-
-    await prisma.move.create({
-      data: {
-        gameId: game.id,
-        ply,
-        san: moveResult.san!,
-        uci: moveResult.uci!,
-        fenAfter: moveResult.fenAfter,
-      },
-    });
-
-    let updatedStatus = game.status;
-    if (moveResult.isGameOver) {
-      updatedStatus = "finished";
-      await prisma.game.update({
-        where: { id: game.id },
-        data: {
-          status: "finished",
-          result: moveResult.result,
-          resultReason: moveResult.resultReason,
-          currentFen: moveResult.fenAfter,
-        },
-      });
-    } else {
-      await prisma.game.update({
-        where: { id: game.id },
-        data: { currentFen: moveResult.fenAfter },
-      });
-    }
-
-    const room = getRoom(token);
-    broadcastAll(room, {
-      type: "bot_moved",
-      move: { from, to, promotion, san: moveResult.san, uci: moveResult.uci },
-      fen: moveResult.fenAfter,
-      ply,
-      isGameOver: moveResult.isGameOver,
-      result: moveResult.result,
-      resultReason: moveResult.resultReason,
-    });
-  } catch (err) {
-    console.error("[Bot] Move error:", err);
-  }
-}
-
 export async function gameRoomWs(fastify: FastifyInstance) {
   fastify.get(
     "/ws/game/:token",
@@ -165,46 +92,28 @@ export async function gameRoomWs(fastify: FastifyInstance) {
           const room = getRoom(token);
           let assignedColor: string;
 
-          if (game.mode === "bot") {
-            // Human always plays their assigned color
-            assignedColor = game.playerColor ?? "white";
-
-            if (game.status === "waiting") {
-              await prisma.game.update({
-                where: { id: game.id },
-                data: {
-                  status: "active",
-                  whiteGuestId:
-                    assignedColor === "white" ? guestId : "bot",
-                  blackGuestId:
-                    assignedColor === "black" ? guestId : "bot",
-                },
-              });
-            }
+          // Assign colors for human vs human
+          if (!game.whiteGuestId) {
+            assignedColor = "white";
+            await prisma.game.update({
+              where: { id: game.id },
+              data: { whiteGuestId: guestId, status: "waiting" },
+            });
+          } else if (!game.blackGuestId && game.whiteGuestId !== guestId) {
+            assignedColor = "black";
+            await prisma.game.update({
+              where: { id: game.id },
+              data: { blackGuestId: guestId, status: "active" },
+            });
+            // Notify existing players
+            broadcast(room, { type: "opponent_joined", color: "black" }, guestId);
+          } else if (game.whiteGuestId === guestId) {
+            assignedColor = "white";
+          } else if (game.blackGuestId === guestId) {
+            assignedColor = "black";
           } else {
-            // Assign colors for human vs human
-            if (!game.whiteGuestId) {
-              assignedColor = "white";
-              await prisma.game.update({
-                where: { id: game.id },
-                data: { whiteGuestId: guestId, status: "waiting" },
-              });
-            } else if (!game.blackGuestId && game.whiteGuestId !== guestId) {
-              assignedColor = "black";
-              await prisma.game.update({
-                where: { id: game.id },
-                data: { blackGuestId: guestId, status: "active" },
-              });
-              // Notify existing players
-              broadcast(room, { type: "opponent_joined", color: "black" }, guestId);
-            } else if (game.whiteGuestId === guestId) {
-              assignedColor = "white";
-            } else if (game.blackGuestId === guestId) {
-              assignedColor = "black";
-            } else {
-              // Spectator
-              assignedColor = "spectator";
-            }
+            // Spectator
+            assignedColor = "spectator";
           }
 
           room.set(guestId, { ws, guestId, color: assignedColor });
@@ -225,21 +134,8 @@ export async function gameRoomWs(fastify: FastifyInstance) {
             resultReason: freshGame!.resultReason,
             color: assignedColor,
             guestId,
-            mode: freshGame!.mode,
-            botDifficulty: freshGame!.botDifficulty,
+            mode: "human",
           });
-
-          // If bot game and bot moves first (human is black), trigger bot
-          if (
-            game.mode === "bot" &&
-            freshGame!.status === "active" &&
-            assignedColor === "black"
-          ) {
-            setTimeout(
-              () => handleBotMove(token, freshGame!.currentFen),
-              500
-            );
-          }
 
           return;
         }
@@ -329,14 +225,6 @@ export async function gameRoomWs(fastify: FastifyInstance) {
             result: moveResult.result,
             resultReason: moveResult.resultReason,
           });
-
-          // Trigger bot response if bot game
-          if (game.mode === "bot" && !moveResult.isGameOver) {
-            setTimeout(
-              () => handleBotMove(token, moveResult.fenAfter!),
-              300
-            );
-          }
 
           return;
         }

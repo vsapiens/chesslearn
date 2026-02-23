@@ -1,12 +1,9 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { nanoid } from "nanoid";
 import { prisma } from "../db/client.js";
-import { validateAndApplyMove } from "../chess/validator.js";
 
 interface CreateGameBody {
-  mode: "human" | "bot";
   colorPreference?: "white" | "black" | "random";
-  botDifficulty?: "easy" | "medium" | "hard";
   timeControl?: string;
 }
 
@@ -19,40 +16,19 @@ interface ResignBody {
 }
 
 export async function gameRoutes(fastify: FastifyInstance) {
-  // POST /api/games — create a new game
+  // POST /api/games — create a new human-vs-human game
   fastify.post<{ Body: CreateGameBody }>(
     "/api/games",
     async (req: FastifyRequest<{ Body: CreateGameBody }>, reply: FastifyReply) => {
-      const {
-        mode = "human",
-        colorPreference = "random",
-        botDifficulty = "medium",
-        timeControl,
-      } = req.body ?? {};
+      const { colorPreference = "random", timeControl } = req.body ?? {};
 
       const token = nanoid(12);
-
-      // Assign colors
-      let whiteGuestId: string | null = null;
-      let blackGuestId: string | null = null;
-      let playerColor: string | null = null;
-
-      if (mode === "bot") {
-        playerColor =
-          colorPreference === "random"
-            ? Math.random() < 0.5
-              ? "white"
-              : "black"
-            : colorPreference ?? "white";
-      }
 
       const game = await prisma.game.create({
         data: {
           token,
-          mode,
+          mode: "human",
           status: "waiting",
-          botDifficulty: mode === "bot" ? botDifficulty : null,
-          playerColor: mode === "bot" ? playerColor : null,
           timeControl: timeControl ?? null,
         },
       });
@@ -61,8 +37,6 @@ export async function gameRoutes(fastify: FastifyInstance) {
         gameId: game.id,
         token: game.token,
         inviteUrl: `${process.env.FRONTEND_URL}/g/${token}`,
-        mode,
-        playerColor,
         status: game.status,
       });
     }
@@ -93,8 +67,6 @@ export async function gameRoutes(fastify: FastifyInstance) {
         currentFen: game.currentFen,
         pgn: game.pgn,
         moves: game.moves,
-        botDifficulty: game.botDifficulty,
-        playerColor: game.playerColor,
         whiteGuestId: game.whiteGuestId,
         blackGuestId: game.blackGuestId,
         timeControl: game.timeControl,
@@ -123,14 +95,7 @@ export async function gameRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: "Game already finished" });
       }
 
-      // Determine which color resigned
-      let resignColor: string;
-      if (game.mode === "bot") {
-        resignColor = game.playerColor ?? "white";
-      } else {
-        resignColor = game.whiteGuestId === guestId ? "white" : "black";
-      }
-
+      const resignColor = game.whiteGuestId === guestId ? "white" : "black";
       const winner = resignColor === "white" ? "black" : "white";
 
       await prisma.game.update({

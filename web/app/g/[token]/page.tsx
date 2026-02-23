@@ -10,7 +10,6 @@ import { GameSocket, ServerEvent, Move } from "@/lib/socket";
 const GUEST_ID_KEY = "chess_guest_id";
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-// S6: localStorage guard — safe in SSR and private browsing
 function getOrCreateGuestId(): string {
   try {
     let id = localStorage.getItem(GUEST_ID_KEY);
@@ -20,7 +19,6 @@ function getOrCreateGuestId(): string {
     }
     return id;
   } catch {
-    // Private browsing or localStorage blocked — use in-memory ID for this tab
     return Math.random().toString(36).slice(2, 12);
   }
 }
@@ -35,8 +33,6 @@ interface GameState {
   result?: string;
   resultReason?: string;
   color: string;
-  mode: string;
-  botDifficulty?: string;
 }
 
 export default function GameRoomPage() {
@@ -51,15 +47,13 @@ export default function GameRoomPage() {
   const [statusMsg, setStatusMsg] = useState<string>("");
   const [copyDone, setCopyDone] = useState(false);
   const [opponentConnected, setOpponentConnected] = useState(false);
-  const [botThinking, setBotThinking] = useState(false);
-  const [wsConnecting, setWsConnecting] = useState(true); // S4: track WS state
+  const [wsConnecting, setWsConnecting] = useState(true);
 
-  // S3: trigger analysis as soon as game ends
   const triggerAnalysis = useCallback(async (gameId: string) => {
     try {
       await fetch(`${API}/api/analysis/${gameId}`, { method: "POST" });
     } catch {
-      // non-blocking — review page will retry
+      // non-blocking
     }
   }, []);
 
@@ -72,7 +66,7 @@ export default function GameRoomPage() {
     const unsubscribe = socket.onMessage((event: ServerEvent) => {
       switch (event.type) {
         case "game_state": {
-          setWsConnecting(false); // S4: hide skeleton
+          setWsConnecting(false);
           setGame({
             gameId: event.gameId,
             fen: event.fen,
@@ -81,20 +75,15 @@ export default function GameRoomPage() {
             result: event.result,
             resultReason: event.resultReason,
             color: event.color,
-            mode: event.mode,
-            botDifficulty: event.botDifficulty,
           });
-          setOpponentConnected(
-            event.status === "active" ||
-              (event.mode === "bot" && event.status !== "waiting")
-          );
-          if (event.status === "waiting" && event.mode === "human") {
-            setStatusMsg("Waiting for opponent to join…");
+          setOpponentConnected(event.status === "active");
+          if (event.status === "waiting") {
+            setStatusMsg("Waiting for opponent to join\u2026");
           } else if (event.status === "active") {
             setStatusMsg("");
           } else if (event.status === "finished") {
             setStatusMsg(formatResult(event.result, event.resultReason));
-            triggerAnalysis(event.gameId); // S3: trigger on reconnect to finished game
+            triggerAnalysis(event.gameId);
           }
           if (event.moves.length > 0) {
             const last = event.moves[event.moves.length - 1];
@@ -103,11 +92,9 @@ export default function GameRoomPage() {
           break;
         }
 
-        case "move_made":
-        case "bot_moved": {
+        case "move_made": {
           const { move, fen, isGameOver, result, resultReason } = event;
           setHintMove(null);
-          setBotThinking(false);
           setLastMove({ from: move.from, to: move.to });
 
           setGame((prev) => {
@@ -152,7 +139,7 @@ export default function GameRoomPage() {
         }
 
         case "opponent_disconnected": {
-          setStatusMsg("Opponent disconnected. Waiting for reconnect…");
+          setStatusMsg("Opponent disconnected. Waiting for reconnect\u2026");
           break;
         }
 
@@ -169,9 +156,6 @@ export default function GameRoomPage() {
       }
     });
 
-    // S3: also trigger analysis when game_over fires (set via game state update)
-    // Handled inside game_over case below via setGame callback + separate effect
-
     socket.connect(guestId);
 
     return () => {
@@ -180,7 +164,7 @@ export default function GameRoomPage() {
     };
   }, [token, triggerAnalysis]);
 
-  // S3: trigger analysis automatically when game transitions to finished
+  // Trigger analysis when game finishes
   useEffect(() => {
     if (game?.status === "finished" && game.gameId) {
       triggerAnalysis(game.gameId);
@@ -201,7 +185,6 @@ export default function GameRoomPage() {
       if (!testMove) return false;
 
       socketRef.current?.send({ type: "move", from, to, promotion });
-      if (game.mode === "bot") setBotThinking(true);
       return true;
     },
     [game]
@@ -236,15 +219,13 @@ export default function GameRoomPage() {
 
   const orientation = (game?.color ?? "white") as "white" | "black";
 
-  // S4: Loading skeleton while WS not yet connected
+  // Loading skeleton
   if (wsConnecting) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex flex-col items-center gap-4">
-            {/* Skeleton player bar */}
             <div className="w-full max-w-[min(90vw,560px)] h-8 bg-zinc-800 rounded animate-pulse" />
-            {/* Skeleton board */}
             <div
               className="bg-zinc-800 rounded-lg animate-pulse"
               style={{ width: "min(90vw, 560px)", aspectRatio: "1" }}
@@ -257,28 +238,22 @@ export default function GameRoomPage() {
             <div className="h-10 bg-zinc-800 rounded animate-pulse" />
           </div>
         </div>
-        <p className="text-center text-zinc-500 text-sm mt-4 animate-pulse">Connecting…</p>
+        <p className="text-center text-zinc-500 text-sm mt-4 animate-pulse">Connecting&hellip;</p>
       </div>
     );
   }
 
   return (
-    // S2: mobile-first layout — flex-col on all screens, lg:flex-row on desktop
     <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
 
         {/* ── Board column ──────────────────────────────────────── */}
         <div className="flex flex-col items-center gap-3 w-full lg:w-auto">
           <PlayerBar
-            name={
-              game?.mode === "bot"
-                ? `Bot (${game.botDifficulty ?? "medium"})`
-                : "Opponent"
-            }
+            name="Opponent"
             color={orientation === "white" ? "black" : "white"}
             isActive={game?.status === "active" && !isMyTurn}
-            connected={opponentConnected || game?.mode === "bot"}
-            thinking={botThinking}
+            connected={opponentConnected}
           />
 
           <GameBoard
@@ -299,17 +274,48 @@ export default function GameRoomPage() {
         </div>
 
         {/* ── Sidebar ─────────────────────────────────────────── */}
-        {/* S2: full-width on mobile, flex-1 on desktop */}
         <div className="w-full lg:flex-1 flex flex-col gap-3 lg:gap-4 min-w-0">
-          {statusMsg && (
+          {/* Invite link — prominent card when waiting */}
+          {!opponentConnected && game?.status === "waiting" && (
+            <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <p className="text-sm font-medium text-amber-400">
+                  Waiting for opponent
+                </p>
+              </div>
+              <p className="text-xs text-zinc-400 mb-3">
+                Share this link with a friend to start playing:
+              </p>
+              <div className="flex gap-2">
+                <code className="flex-1 text-xs bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg text-zinc-300 truncate">
+                  {typeof window !== "undefined" ? window.location.href : ""}
+                </code>
+                <button
+                  onClick={copyLink}
+                  className={`px-4 py-2 min-h-touch font-medium text-xs rounded-lg transition-all whitespace-nowrap ${
+                    copyDone
+                      ? "bg-emerald-500 text-black"
+                      : "bg-amber-500 hover:bg-amber-400 text-black"
+                  }`}
+                >
+                  {copyDone ? "Copied!" : "Copy Link"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Status message (disconnect, game result) */}
+          {statusMsg && game?.status !== "waiting" && (
             <div className="p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 text-center">
               {statusMsg}
             </div>
           )}
 
+          {/* Turn indicator */}
           {game?.status === "active" && (
             <div
-              className={`text-center text-sm font-medium px-3 py-2 rounded-lg ${
+              className={`text-center text-sm font-medium px-3 py-2.5 rounded-lg transition-colors ${
                 isMyTurn
                   ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                   : "bg-zinc-800 text-zinc-400 border border-zinc-700"
@@ -319,26 +325,8 @@ export default function GameRoomPage() {
             </div>
           )}
 
-          {/* Invite link */}
-          {game?.mode === "human" && !opponentConnected && (
-            <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-lg">
-              <p className="text-xs text-zinc-400 mb-2">Share to invite opponent:</p>
-              <div className="flex gap-2">
-                <code className="flex-1 text-xs bg-zinc-800 px-2 py-1.5 rounded text-zinc-300 truncate break-all">
-                  {typeof window !== "undefined" ? window.location.href : ""}
-                </code>
-                <button
-                  onClick={copyLink}
-                  className="px-3 min-h-touch bg-amber-500 hover:bg-amber-400 text-black text-xs font-medium rounded transition-colors whitespace-nowrap"
-                >
-                  {copyDone ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Move list */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 sm:p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4">
             <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
               Moves
             </h3>
@@ -374,7 +362,7 @@ export default function GameRoomPage() {
                 }}
                 className="py-2.5 min-h-touch bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg text-sm transition-colors"
               >
-                Review Game →
+                Review Game &rarr;
               </button>
               <a
                 href="/play/new"
@@ -402,9 +390,9 @@ function capitalize(s: string) {
 }
 
 function PlayerBar({
-  name, color, isActive, connected, thinking,
+  name, color, isActive, connected,
 }: {
-  name: string; color: string; isActive: boolean; connected?: boolean; thinking?: boolean;
+  name: string; color: string; isActive: boolean; connected?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 w-full" style={{ maxWidth: "min(90vw, 560px)" }}>
@@ -414,7 +402,6 @@ function PlayerBar({
         }`}
       />
       <span className="text-sm font-medium text-zinc-300 truncate">{name}</span>
-      {thinking && <span className="text-xs text-zinc-500 animate-pulse">thinking…</span>}
       <div className="ml-auto flex items-center gap-1.5">
         <span className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-500" : "bg-zinc-600"}`} />
         {isActive && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
