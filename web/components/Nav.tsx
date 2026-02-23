@@ -5,7 +5,7 @@ import Link from "next/link";
 
 const links = [
   { href: "/play/new", label: "New Game" },
-  { href: "/learn", label: "Learn" },
+  { href: "/learn", label: "Review & Learn" },
 ];
 
 export function Nav() {
