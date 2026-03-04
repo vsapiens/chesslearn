@@ -16,30 +16,35 @@ export default function HomePage() {
           PLAY. CHALLENGE. <span className="text-amber text-glow-amber">IMPROVE.</span>
         </h1>
         <p className="text-phosphor-dim text-base sm:text-lg max-w-xl mx-auto font-mono">
-          Play chess against friends with a shareable link, or train against
-          bots. Review every game with engine analysis.
+          Create a game, share the link, and play instantly.
+          Real-time multiplayer chess with post-game analysis.
         </p>
         {/* Decorative gradient line */}
         <div className="mt-4 mx-auto w-48 h-px bg-gradient-to-r from-transparent via-phosphor/40 to-transparent" />
+        <Link
+          href="/play/new"
+          className="inline-block mt-6 btn-primary px-8 py-3 text-base"
+        >
+          &gt; CREATE GAME
+        </Link>
+      </div>
+
+      {/* How it works */}
+      <div className="grid sm:grid-cols-3 gap-6 mb-10 sm:mb-16">
+        <Step num="1" title="CREATE" description="Set your color preference and start a new game." />
+        <Step num="2" title="SHARE" description="Copy the invite link and send it to your friend." />
+        <Step num="3" title="PLAY" description="Your friend opens the link and the game begins instantly." />
       </div>
 
       {/* Cards */}
-      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
         <GameCard
-          href="/play/new?mode=human"
+          href="/play/new"
           code="[LINK::CONNECT]"
           title="VS FRIEND"
-          description="Generate a link and share it. No account needed — just click and play."
+          description="Generate a link and share it. No account needed &mdash; just click and play."
           cta="> CREATE INVITE"
           accent="phosphor"
-        />
-        <GameCard
-          href="/play/new?mode=bot"
-          code="[BOT::ENGAGE]"
-          title="VS ENGINE"
-          description="Challenge Easy, Medium, or Hard bots powered by Stockfish."
-          cta="> PLAY BOT"
-          accent="amber"
         />
         <GameCard
           href="/learn"
@@ -47,7 +52,7 @@ export default function HomePage() {
           title="LEARN & REVIEW"
           description="After every game, see your blunders, best moves, and key moments."
           cta="> REVIEW GAMES"
-          accent="cyan"
+          accent="amber"
         />
       </div>
 
@@ -62,8 +67,8 @@ export default function HomePage() {
             "Server-side move validation",
             "Resumable games via unique link",
             "Engine-powered post-game review",
-            "Blunder / Mistake / Inaccuracy classification",
-            "Hint system (3 hints per game)",
+            "Blunder / Mistake / Inaccuracy detection",
+            "In-game hint system",
             "Legal move highlighting",
             "Drag-drop + click-to-move",
           ].map((f) => (
@@ -74,6 +79,18 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Step({ num, title, description }: { num: string; title: string; description: string }) {
+  return (
+    <div className="text-center sm:text-left">
+      <div className="inline-flex items-center justify-center w-8 h-8 border border-phosphor/30 text-phosphor text-sm font-mono font-bold mb-3">
+        {num}
+      </div>
+      <h3 className="text-phosphor-dim font-display font-semibold mb-1">{title}</h3>
+      <p className="text-phosphor-muted text-sm leading-relaxed font-mono">{description}</p>
     </div>
   );
 }
@@ -91,22 +108,19 @@ function GameCard({
   title: string;
   description: string;
   cta: string;
-  accent: "phosphor" | "amber" | "cyan";
+  accent: "phosphor" | "amber";
 }) {
   const accentMap = {
     phosphor: "border-phosphor/20 hover:border-phosphor/50 hover:shadow-phosphor",
     amber: "border-amber/20 hover:border-amber/50 hover:shadow-amber",
-    cyan: "border-cyan/20 hover:border-cyan/50 hover:shadow-cyan",
   };
   const ctaMap = {
     phosphor: "text-phosphor border-phosphor/40 hover:border-phosphor/70",
     amber: "text-amber border-amber/40 hover:border-amber/70",
-    cyan: "text-cyan border-cyan/40 hover:border-cyan/70",
   };
   const codeColor = {
     phosphor: "text-phosphor/60",
     amber: "text-amber/60",
-    cyan: "text-cyan/60",
   };
 
   return (

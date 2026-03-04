@@ -34,8 +34,6 @@ interface GameState {
   result?: string;
   resultReason?: string;
   color: string;
-  mode: string;
-  botDifficulty?: string;
 }
 
 export default function GameRoomPage() {
@@ -50,9 +48,7 @@ export default function GameRoomPage() {
   const [statusMsg, setStatusMsg] = useState<string>("");
   const [copyDone, setCopyDone] = useState(false);
   const [opponentConnected, setOpponentConnected] = useState(false);
-  const [botThinking, setBotThinking] = useState(false);
   const [wsConnecting, setWsConnecting] = useState(true);
-  // New error states
   const [connState, setConnState] = useState<ConnectionState>("connecting");
   const [connDetail, setConnDetail] = useState<string>("");
   const [wsError, setWsError] = useState<string>("");
@@ -61,7 +57,7 @@ export default function GameRoomPage() {
     try {
       await fetch(`${API}/api/analysis/${gameId}`, { method: "POST" });
     } catch {
-      // non-blocking — review page will handle
+      // non-blocking
     }
   }, []);
 
@@ -70,7 +66,6 @@ export default function GameRoomPage() {
     const socket = new GameSocket(token);
     socketRef.current = socket;
 
-    // Connection timeout — if we don't get game_state within 15s, show error
     const connectTimeout = setTimeout(() => {
       if (wsConnecting) {
         setWsConnecting(false);
@@ -78,7 +73,6 @@ export default function GameRoomPage() {
       }
     }, WS_CONNECT_TIMEOUT_MS);
 
-    // Subscribe to connection state changes
     const unsubConn = socket.onConnectionStateChange((state, detail) => {
       setConnState(state);
       setConnDetail(detail ?? "");
@@ -92,7 +86,6 @@ export default function GameRoomPage() {
         setStatusMsg(detail ?? "Reconnecting...");
       }
       if (state === "connected") {
-        // Clear reconnecting message (game_state will clear wsConnecting)
         if (statusMsg.startsWith("Reconnecting")) {
           setStatusMsg("");
         }
@@ -113,14 +106,9 @@ export default function GameRoomPage() {
             result: event.result,
             resultReason: event.resultReason,
             color: event.color,
-            mode: event.mode,
-            botDifficulty: event.botDifficulty,
           });
-          setOpponentConnected(
-            event.status === "active" ||
-              (event.mode === "bot" && event.status !== "waiting")
-          );
-          if (event.status === "waiting" && event.mode === "human") {
+          setOpponentConnected(event.status === "active");
+          if (event.status === "waiting") {
             setStatusMsg("Waiting for opponent to join\u2026");
           } else if (event.status === "active") {
             setStatusMsg("");
@@ -135,11 +123,9 @@ export default function GameRoomPage() {
           break;
         }
 
-        case "move_made":
-        case "bot_moved": {
+        case "move_made": {
           const { move, fen, isGameOver, result, resultReason } = event;
           setHintMove(null);
-          setBotThinking(false);
           setLastMove({ from: move.from, to: move.to });
 
           setGame((prev) => {
@@ -195,9 +181,7 @@ export default function GameRoomPage() {
         }
 
         case "error": {
-          // Show server-sent errors to the user
           setWsError(event.message);
-          // Auto-clear non-critical errors after 6s
           setTimeout(() => setWsError((prev) => prev === event.message ? "" : prev), 6000);
           break;
         }
@@ -215,6 +199,7 @@ export default function GameRoomPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, triggerAnalysis]);
 
+  // Trigger analysis when game finishes
   useEffect(() => {
     if (game?.status === "finished" && game.gameId) {
       triggerAnalysis(game.gameId);
@@ -234,7 +219,6 @@ export default function GameRoomPage() {
       if (!testMove) return false;
 
       socketRef.current?.send({ type: "move", from, to, promotion });
-      if (game.mode === "bot") setBotThinking(true);
       return true;
     },
     [game]
@@ -298,7 +282,7 @@ export default function GameRoomPage() {
     );
   }
 
-  // Fatal connection error — show full-screen error with retry
+  // Fatal connection error
   if (wsError && !game) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
@@ -323,15 +307,10 @@ export default function GameRoomPage() {
         {/* Board column */}
         <div className="flex flex-col items-center gap-3 w-full lg:w-auto">
           <PlayerBar
-            name={
-              game?.mode === "bot"
-                ? `BOT (${(game.botDifficulty ?? "medium").toUpperCase()})`
-                : "OPPONENT"
-            }
+            name="OPPONENT"
             color={orientation === "white" ? "black" : "white"}
             isActive={game?.status === "active" && !isMyTurn}
-            connected={opponentConnected || game?.mode === "bot"}
-            thinking={botThinking}
+            connected={opponentConnected}
           />
 
           <GameBoard
@@ -353,7 +332,7 @@ export default function GameRoomPage() {
 
         {/* Sidebar */}
         <div className="w-full lg:flex-1 flex flex-col gap-3 lg:gap-4 min-w-0">
-          {/* WS error banner — shown inline when game is loaded */}
+          {/* WS error banner */}
           {wsError && game && (
             <div className="panel border-danger/30 text-sm text-center font-mono">
               <span className="text-danger">[ERROR]</span>{" "}
@@ -368,29 +347,18 @@ export default function GameRoomPage() {
             </div>
           )}
 
-          {statusMsg && (
-            <div className="panel border-phosphor/20 text-sm text-phosphor-dim text-center font-mono">
-              &gt; {statusMsg}
-            </div>
-          )}
-
-          {game?.status === "active" && (
-            <div
-              className={`text-center text-sm font-mono px-3 py-2 ${
-                isMyTurn
-                  ? "panel border-amber/30 text-amber text-glow-amber"
-                  : "panel border-surface-border text-phosphor-muted"
-              }`}
-              style={isMyTurn ? { boxShadow: "0 0 12px rgba(255,176,0,0.15)" } : {}}
-            >
-              {isMyTurn ? "> YOUR MOVE" : "> AWAITING OPPONENT"}
-            </div>
-          )}
-
-          {/* Invite link */}
-          {game?.mode === "human" && !opponentConnected && (
-            <div className="panel">
-              <p className="text-xs text-phosphor-muted mb-2 font-mono">// TRANSMISSION CODE</p>
+          {/* Invite link — prominent when waiting */}
+          {!opponentConnected && game?.status === "waiting" && (
+            <div className="panel border-amber/30">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 bg-amber animate-glow-pulse" />
+                <p className="text-sm font-mono text-amber">
+                  WAITING FOR OPPONENT
+                </p>
+              </div>
+              <p className="text-xs text-phosphor-muted mb-3 font-mono">
+                // Share this link with a friend to start playing:
+              </p>
               <div className="flex gap-2">
                 <code className="flex-1 text-xs bg-surface px-2 py-1.5 text-phosphor-dim truncate break-all font-mono border border-surface-border">
                   {typeof window !== "undefined" ? window.location.href : ""}
@@ -402,6 +370,27 @@ export default function GameRoomPage() {
                   {copyDone ? "[COPIED]" : "[COPY]"}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Status message (disconnect, game result) */}
+          {statusMsg && game?.status !== "waiting" && (
+            <div className="panel border-phosphor/20 text-sm text-phosphor-dim text-center font-mono">
+              &gt; {statusMsg}
+            </div>
+          )}
+
+          {/* Turn indicator */}
+          {game?.status === "active" && (
+            <div
+              className={`text-center text-sm font-mono px-3 py-2 ${
+                isMyTurn
+                  ? "panel border-amber/30 text-amber text-glow-amber"
+                  : "panel border-surface-border text-phosphor-muted"
+              }`}
+              style={isMyTurn ? { boxShadow: "0 0 12px rgba(255,176,0,0.15)" } : {}}
+            >
+              {isMyTurn ? "> YOUR MOVE" : "> AWAITING OPPONENT"}
             </div>
           )}
 
@@ -466,9 +455,9 @@ function formatResult(result?: string, reason?: string): string {
 }
 
 function PlayerBar({
-  name, color, isActive, connected, thinking,
+  name, color, isActive, connected,
 }: {
-  name: string; color: string; isActive: boolean; connected?: boolean; thinking?: boolean;
+  name: string; color: string; isActive: boolean; connected?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 w-full font-mono" style={{ maxWidth: "min(90vw, 560px)" }}>
@@ -484,7 +473,6 @@ function PlayerBar({
       }`}>
         {name}
       </span>
-      {thinking && <span className="text-xs text-amber animate-data-stream">COMPUTING...</span>}
       <div className="ml-auto flex items-center gap-1.5 text-xs">
         <span className={connected ? "text-phosphor" : "text-phosphor-muted/40"}>
           {connected ? "[ONLINE]" : "[OFFLINE]"}

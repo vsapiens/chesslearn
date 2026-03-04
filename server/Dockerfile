@@ -18,4 +18,4 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./
 ENV NODE_ENV=production
 EXPOSE 3001
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]

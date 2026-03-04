@@ -17,10 +17,8 @@ export type ServerEvent =
       color: string;
       guestId: string;
       mode: string;
-      botDifficulty?: string;
     }
   | { type: "move_made"; move: MoveInfo; fen: string; ply: number; isGameOver?: boolean; result?: string; resultReason?: string }
-  | { type: "bot_moved"; move: MoveInfo; fen: string; ply: number; isGameOver?: boolean; result?: string; resultReason?: string }
   | { type: "game_over"; result: string; resultReason: string }
   | { type: "opponent_joined"; color: string }
   | { type: "opponent_disconnected" }
