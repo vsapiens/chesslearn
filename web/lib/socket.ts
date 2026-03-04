@@ -41,13 +41,17 @@ export interface MoveInfo {
   uci?: string;
 }
 
+export type ConnectionState = "connecting" | "connected" | "reconnecting" | "failed";
+
 export class GameSocket {
   private ws: WebSocket | null = null;
   private token: string;
   private handlers: Array<(event: ServerEvent) => void> = [];
+  private connectionStateHandlers: Array<(state: ConnectionState, detail?: string) => void> = [];
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private maxReconnects = 5;
+  private guestId: string = "";
 
   constructor(token: string) {
     this.token = token;
@@ -55,11 +59,15 @@ export class GameSocket {
 
   connect(guestId: string): void {
     if (this.ws && this.ws.readyState < 2) return; // CONNECTING or OPEN
+    this.guestId = guestId;
+
+    this.emitConnectionState("connecting");
 
     this.ws = new WebSocket(`${WS_URL}/ws/game/${this.token}`);
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
+      this.emitConnectionState("connected");
       this.send({ type: "join", guestId });
     };
 
@@ -69,21 +77,38 @@ export class GameSocket {
         this.handlers.forEach((h) => h(msg));
       } catch (e) {
         console.error("[WS] Parse error:", e);
+        // Surface parse errors as a server error event to handlers
+        const errorEvent: ServerEvent = {
+          type: "error",
+          message: "Received malformed data from server.",
+        };
+        this.handlers.forEach((h) => h(errorEvent));
       }
     };
 
     this.ws.onclose = () => {
       if (this.reconnectAttempts < this.maxReconnects) {
+        const attempt = this.reconnectAttempts + 1;
+        this.emitConnectionState(
+          "reconnecting",
+          `Reconnecting... (attempt ${attempt}/${this.maxReconnects})`
+        );
         const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 10000);
         this.reconnectTimer = setTimeout(() => {
           this.reconnectAttempts++;
           this.connect(guestId);
         }, delay);
+      } else {
+        this.emitConnectionState(
+          "failed",
+          "Connection lost. The server may be down — please refresh to try again."
+        );
       }
     };
 
     this.ws.onerror = (err) => {
       console.error("[WS] Error:", err);
+      // onerror is always followed by onclose, so we let onclose handle state changes
     };
   }
 
@@ -100,10 +125,22 @@ export class GameSocket {
     };
   }
 
+  /** Subscribe to connection state changes (connecting, connected, reconnecting, failed). */
+  onConnectionStateChange(handler: (state: ConnectionState, detail?: string) => void): () => void {
+    this.connectionStateHandlers.push(handler);
+    return () => {
+      this.connectionStateHandlers = this.connectionStateHandlers.filter((h) => h !== handler);
+    };
+  }
+
   disconnect(): void {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectAttempts = this.maxReconnects; // prevent reconnect
     this.ws?.close();
     this.ws = null;
+  }
+
+  private emitConnectionState(state: ConnectionState, detail?: string): void {
+    this.connectionStateHandlers.forEach((h) => h(state, detail));
   }
 }

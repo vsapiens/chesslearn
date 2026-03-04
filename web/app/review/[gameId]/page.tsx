@@ -7,7 +7,7 @@ import { MoveList } from "@/components/MoveList";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { getGame, getAnalysis, triggerAnalysis, AnalysisResponse, GameResponse } from "@/lib/api";
 
-const MAX_POLLS = 30; // ~60s at 2s intervals
+const MAX_POLLS = 30;
 
 export default function ReviewPage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -17,29 +17,48 @@ export default function ReviewPage() {
   const [currentPly, setCurrentPly] = useState(0);
   const [viewFen, setViewFen] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  // S5: polling timeout state
+  const [loadError, setLoadError] = useState<string>("");
+  const [analysisError, setAnalysisError] = useState<string>("");
   const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Load game + trigger analysis
   useEffect(() => {
     let cancelled = false;
     let pollTimer: ReturnType<typeof setTimeout>;
-    let polls = 0; // S5: track in ref-like closure var to avoid stale state
+    let polls = 0;
 
     async function load() {
       try {
-        const g = await getGame(gameId).catch(() => null);
-        if (!g || cancelled) return;
+        setLoadError("");
+        setAnalysisError("");
+
+        let g: GameResponse;
+        try {
+          g = await getGame(gameId);
+        } catch (err: any) {
+          if (!cancelled) {
+            setLoadError(err.message || "Failed to load game data.");
+          }
+          return;
+        }
+
+        if (cancelled) return;
 
         setGame(g);
         setViewFen(g.currentFen);
         setCurrentPly(g.moves.length);
 
-        // Trigger analysis (non-blocking — server returns 202 if already processing)
-        await triggerAnalysis(g.gameId);
+        // Trigger analysis — may fail if server is down, that's okay
+        try {
+          await triggerAnalysis(g.gameId);
+        } catch (err: any) {
+          if (!cancelled) {
+            setAnalysisError(err.message || "Failed to start analysis.");
+          }
+          return;
+        }
 
-        // S5: poll with timeout
+        // Poll for analysis results
         const poll = async (): Promise<void> => {
           if (cancelled) return;
 
@@ -47,30 +66,32 @@ export default function ReviewPage() {
             const a = await getAnalysis(g.gameId);
             if (cancelled) return;
             setAnalysis(a);
+            setAnalysisError("");
 
-            if (a.status === "ready") return; // done
+            if (a.status === "ready") return;
 
-            polls += 1;
-            if (polls >= MAX_POLLS) {
-              setAnalysisTimedOut(true); // S5: show timeout UI
-              return;
-            }
-
-            pollTimer = setTimeout(poll, 2000);
-          } catch {
-            if (cancelled) return;
             polls += 1;
             if (polls >= MAX_POLLS) {
               setAnalysisTimedOut(true);
               return;
             }
+
+            pollTimer = setTimeout(poll, 2000);
+          } catch (err: any) {
+            if (cancelled) return;
+            polls += 1;
+            if (polls >= MAX_POLLS) {
+              setAnalysisTimedOut(true);
+              setAnalysisError(err.message || "Analysis polling failed.");
+              return;
+            }
+            // Retry — but log for debugging
+            console.warn("[Review] Poll error, retrying:", err.message);
             pollTimer = setTimeout(poll, 2000);
           }
         };
 
         poll();
-      } catch (err) {
-        console.error("[Review]", err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -81,18 +102,22 @@ export default function ReviewPage() {
       cancelled = true;
       clearTimeout(pollTimer);
     };
-  }, [gameId, retryCount]); // S5: retryCount causes effect to re-run on retry
+  }, [gameId, retryCount]);
 
-  // S5: retry handler — re-triggers analysis + resets timeout state
   async function retryAnalysis() {
     if (!game) return;
     setAnalysisTimedOut(false);
     setAnalysis(null);
-    await triggerAnalysis(game.gameId);
+    setAnalysisError("");
+    try {
+      await triggerAnalysis(game.gameId);
+    } catch (err: any) {
+      setAnalysisError(err.message || "Failed to restart analysis.");
+      return;
+    }
     setRetryCount((c) => c + 1);
   }
 
-  // Navigate to a ply
   function goToPly(ply: number) {
     if (!game) return;
     setCurrentPly(ply);
@@ -108,16 +133,33 @@ export default function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-zinc-500">
-        Loading game…
+      <div className="flex items-center justify-center h-64 text-phosphor-muted font-mono animate-data-stream">
+        &gt; Loading game data...
       </div>
     );
   }
 
-  if (!game) {
+  // Game load error — show specific error with retry
+  if (loadError || !game) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-400">
-        Game not found.
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <div className="panel border-danger/30 mb-6">
+          <p className="text-danger font-mono text-sm mb-1">[ERROR]</p>
+          <p className="text-phosphor-dim font-mono text-sm">
+            {loadError || "Game not found. It may have expired or the link is invalid."}
+          </p>
+        </div>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => { setLoading(true); setLoadError(""); setRetryCount((c) => c + 1); }}
+            className="btn-primary"
+          >
+            &gt; RETRY
+          </button>
+          <a href="/play/new" className="btn-secondary">
+            &gt; NEW GAME
+          </a>
+        </div>
       </div>
     );
   }
@@ -133,21 +175,23 @@ export default function ReviewPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl font-bold text-white">Game Review</h1>
-        <div className="flex items-center gap-3">
+        <h1 className="font-display text-xl sm:text-2xl font-bold text-phosphor text-glow">
+          // POST-GAME ANALYSIS
+        </h1>
+        <div className="flex items-center gap-3 font-mono">
           {game.result && (
-            <span className="text-sm text-zinc-400">
-              {game.result === "draw"
-                ? "Draw"
-                : `${capitalize(game.result)} won`}
-              {game.resultReason ? ` (${game.resultReason.replace("_", " ")})` : ""}
+            <span className="text-sm text-phosphor-dim">
+              RESULT: {game.result === "draw"
+                ? "DRAW"
+                : `${game.result.toUpperCase()} WINS`}
+              {game.resultReason ? ` [${game.resultReason.replace("_", " ").toUpperCase()}]` : ""}
             </span>
           )}
           <a
             href={`/g/${game.token}`}
-            className="text-sm text-amber-400 hover:underline"
+            className="text-sm text-phosphor hover:text-glow transition-all"
           >
-            Back to game
+            &gt; BACK
           </a>
         </div>
       </div>
@@ -164,23 +208,23 @@ export default function ReviewPage() {
 
           {/* Navigation controls */}
           <div className="flex gap-2 items-center">
-            <NavBtn onClick={() => goToPly(0)} label="|◀" disabled={currentPly === 0} />
+            <NavBtn onClick={() => goToPly(0)} label="|<" disabled={currentPly === 0} />
             <NavBtn
               onClick={() => goToPly(Math.max(0, currentPly - 1))}
-              label="◀"
+              label="<"
               disabled={currentPly === 0}
             />
-            <span className="text-xs text-zinc-500 min-w-[60px] text-center">
-              {currentPly === 0 ? "Start" : `Move ${currentPly}`}
+            <span className="text-xs text-phosphor-muted min-w-[60px] text-center font-mono">
+              {currentPly === 0 ? "START" : `PLY ${currentPly}`}
             </span>
             <NavBtn
               onClick={() => goToPly(Math.min(game.moves.length, currentPly + 1))}
-              label="▶"
+              label=">"
               disabled={currentPly >= game.moves.length}
             />
             <NavBtn
               onClick={() => goToPly(game.moves.length)}
-              label="▶|"
+              label=">|"
               disabled={currentPly >= game.moves.length}
             />
           </div>
@@ -189,9 +233,9 @@ export default function ReviewPage() {
         {/* Sidebar */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {/* Move list */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
-              Moves
+          <div className="panel">
+            <h3 className="text-xs font-mono text-phosphor-muted uppercase tracking-wider mb-3">
+              // MOVE LOG
             </h3>
             <MoveList
               moves={game.moves}
@@ -201,14 +245,14 @@ export default function ReviewPage() {
           </div>
 
           {/* Analysis panel */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+          <div className="panel">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                Analysis
+              <h3 className="text-xs font-mono text-phosphor-muted uppercase tracking-wider">
+                // ENGINE ANALYSIS
               </h3>
               {analysis?.status === "processing" && !analysisTimedOut && (
-                <span className="text-xs text-amber-400 animate-pulse">
-                  Analyzing…
+                <span className="text-xs text-amber font-mono animate-data-stream">
+                  PROCESSING...
                 </span>
               )}
             </div>
@@ -223,28 +267,39 @@ export default function ReviewPage() {
                 currentPly={currentPly}
               />
             ) : analysisTimedOut ? (
-              /* S5: Timeout state with retry */
               <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <p className="text-sm text-zinc-400">
-                  Analysis timed out. The engine may still be processing.
+                <p className="text-danger font-mono text-xs mb-1">[TIMEOUT]</p>
+                <p className="text-sm text-phosphor-dim font-mono">
+                  {analysisError || "Analysis timed out. The engine may still be processing."}
                 </p>
                 <button
                   onClick={retryAnalysis}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold rounded-lg transition-colors"
+                  className="btn-primary"
                 >
-                  Retry
+                  &gt; RETRY ANALYSIS
+                </button>
+              </div>
+            ) : analysisError ? (
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <p className="text-danger font-mono text-xs mb-1">[ANALYSIS ERROR]</p>
+                <p className="text-sm text-phosphor-dim font-mono">{analysisError}</p>
+                <button
+                  onClick={retryAnalysis}
+                  className="btn-primary"
+                >
+                  &gt; RETRY ANALYSIS
                 </button>
               </div>
             ) : analysis?.status === "processing" ? (
-              <div className="text-sm text-zinc-500 py-4 text-center">
-                Engine is analyzing the game…
-                <div className="mt-2 text-xs text-zinc-600">
+              <div className="text-sm text-phosphor-muted py-4 text-center font-mono">
+                &gt; Engine processing game data...
+                <div className="mt-2 text-xs text-phosphor-muted/50">
                   This may take up to 60 seconds.
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-zinc-500 py-4 text-center">
-                Analysis not available.
+              <div className="text-sm text-phosphor-muted py-4 text-center font-mono">
+                &gt; Waiting for analysis to begin...
               </div>
             )}
           </div>
@@ -267,13 +322,9 @@ function NavBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="px-3 py-2 sm:px-2 sm:py-1 min-w-touch min-h-touch sm:min-w-0 sm:min-h-0 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700 rounded text-xs text-zinc-300 transition-colors font-mono flex items-center justify-center"
+      className="px-3 py-2 sm:px-2 sm:py-1 min-w-touch min-h-touch sm:min-w-0 sm:min-h-0 panel hover:bg-phosphor-glow10 disabled:opacity-40 disabled:cursor-not-allowed text-xs text-phosphor-dim transition-colors font-mono flex items-center justify-center"
     >
       {label}
     </button>
   );
-}
-
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

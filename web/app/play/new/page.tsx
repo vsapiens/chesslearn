@@ -1,11 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-export default function NewGamePage() {
+/** Suspense boundary for loading skeleton. */
+export default function NewGamePageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-16">
+          <div className="h-8 bg-surface-raised border border-surface-border animate-pulse mb-4 w-48" />
+          <div className="h-4 bg-surface-raised border border-surface-border animate-pulse mb-8 w-72" />
+          <div className="space-y-6">
+            <div className="h-20 bg-surface-raised border border-surface-border animate-pulse" />
+            <div className="h-12 bg-surface-raised border border-surface-border animate-pulse" />
+          </div>
+        </div>
+      }
+    >
+      <NewGamePage />
+    </Suspense>
+  );
+}
+
+function NewGamePage() {
   const router = useRouter();
 
   const [colorPref, setColorPref] = useState<"white" | "black" | "random">("random");
@@ -24,71 +44,85 @@ export default function NewGamePage() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create game");
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const body = await res.json();
+          detail = body.error || body.message || "";
+        } catch {
+          // not JSON
+        }
+        throw new Error(
+          detail || `Server returned ${res.status}. Please try again.`
+        );
+      }
 
       const data = await res.json();
       router.push(`/g/${data.token}`);
     } catch (e: any) {
-      setError(e.message ?? "Something went wrong");
+      if (e instanceof TypeError && e.message === "Failed to fetch") {
+        setError("Cannot reach the server. Check your connection and try again.");
+      } else {
+        setError(e.message ?? "Something went wrong. Please try again.");
+      }
       setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 sm:px-6 py-10 sm:py-20">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-          New Game
-        </h1>
-        <p className="text-zinc-400 text-sm">
-          Choose your side and create an invite link to share with a friend.
-        </p>
-      </div>
+    <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-16">
+      <h1 className="font-display text-2xl sm:text-3xl font-bold text-phosphor text-glow mb-2">
+        NEW MISSION
+      </h1>
+      <p className="text-phosphor-muted mb-8 font-mono text-sm">
+        &gt; Choose your side and create an invite link to share.
+      </p>
 
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-6">
-        {/* Color preference */}
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-3">
-            Play as
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {(["white", "random", "black"] as const).map((c) => (
-              <button
-                key={c}
-                onClick={() => setColorPref(c)}
-                className={`py-3 rounded-xl border text-sm font-medium transition-all flex flex-col items-center gap-1.5 ${
-                  colorPref === c
-                    ? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-sm shadow-amber-500/10"
-                    : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                <span className="text-xl">
-                  {c === "white" ? "\u2659" : c === "black" ? "\u265F" : "\u2696"}
-                </span>
-                <span>{c === "white" ? "White" : c === "black" ? "Black" : "Random"}</span>
-              </button>
-            ))}
-          </div>
+      {/* Color preference */}
+      <div className="mb-8">
+        <label className="block text-sm font-mono text-phosphor-muted mb-2">
+          //&gt; Play as
+        </label>
+        <div className="grid grid-cols-3 gap-3">
+          <button
+            onClick={() => setColorPref("white")}
+            className={`option-btn ${colorPref === "white" ? "selected" : ""}`}
+          >
+            [W] WHITE
+          </button>
+          <button
+            onClick={() => setColorPref("random")}
+            className={`option-btn ${colorPref === "random" ? "selected" : ""}`}
+          >
+            [?] RANDOM
+          </button>
+          <button
+            onClick={() => setColorPref("black")}
+            className={`option-btn ${colorPref === "black" ? "selected" : ""}`}
+          >
+            [B] BLACK
+          </button>
         </div>
-
-        {error && (
-          <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        <button
-          onClick={createGame}
-          disabled={loading}
-          className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors text-base"
-        >
-          {loading ? "Creating game\u2026" : "Create Game & Get Link"}
-        </button>
-
-        <p className="text-xs text-zinc-500 text-center leading-relaxed">
-          You'll get a unique link to share. Your friend opens it and the game starts automatically.
-        </p>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 border border-danger/30 text-danger text-sm font-mono"
+          style={{ background: "rgba(255,51,51,0.08)" }}>
+          [ERROR] {error}
+        </div>
+      )}
+
+      <button
+        onClick={createGame}
+        disabled={loading}
+        className="btn-primary w-full text-center"
+      >
+        {loading ? "INITIALIZING..." : "> EXECUTE"}
+      </button>
+
+      <p className="text-xs text-phosphor-muted text-center leading-relaxed mt-4 font-mono">
+        // You&apos;ll get a unique link to share. Your friend opens it and the game starts automatically.
+      </p>
     </div>
   );
 }

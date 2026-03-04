@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { Chess } from "chess.js";
 import { GameBoard } from "@/components/GameBoard";
 import { MoveList } from "@/components/MoveList";
-import { GameSocket, ServerEvent, Move } from "@/lib/socket";
+import { GameSocket, ServerEvent, Move, ConnectionState } from "@/lib/socket";
 
 const GUEST_ID_KEY = "chess_guest_id";
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const WS_CONNECT_TIMEOUT_MS = 15_000;
 
 function getOrCreateGuestId(): string {
   try {
@@ -48,6 +49,9 @@ export default function GameRoomPage() {
   const [copyDone, setCopyDone] = useState(false);
   const [opponentConnected, setOpponentConnected] = useState(false);
   const [wsConnecting, setWsConnecting] = useState(true);
+  const [connState, setConnState] = useState<ConnectionState>("connecting");
+  const [connDetail, setConnDetail] = useState<string>("");
+  const [wsError, setWsError] = useState<string>("");
 
   const triggerAnalysis = useCallback(async (gameId: string) => {
     try {
@@ -57,16 +61,43 @@ export default function GameRoomPage() {
     }
   }, []);
 
-  // ── Connect to WebSocket ──────────────────────────────────────
   useEffect(() => {
     const guestId = getOrCreateGuestId();
     const socket = new GameSocket(token);
     socketRef.current = socket;
 
+    const connectTimeout = setTimeout(() => {
+      if (wsConnecting) {
+        setWsConnecting(false);
+        setWsError("Connection timed out. The server may be unavailable — please refresh to try again.");
+      }
+    }, WS_CONNECT_TIMEOUT_MS);
+
+    const unsubConn = socket.onConnectionStateChange((state, detail) => {
+      setConnState(state);
+      setConnDetail(detail ?? "");
+
+      if (state === "failed") {
+        setWsConnecting(false);
+        setWsError(detail ?? "Connection lost. Please refresh to reconnect.");
+        clearTimeout(connectTimeout);
+      }
+      if (state === "reconnecting") {
+        setStatusMsg(detail ?? "Reconnecting...");
+      }
+      if (state === "connected") {
+        if (statusMsg.startsWith("Reconnecting")) {
+          setStatusMsg("");
+        }
+      }
+    });
+
     const unsubscribe = socket.onMessage((event: ServerEvent) => {
       switch (event.type) {
         case "game_state": {
+          clearTimeout(connectTimeout);
           setWsConnecting(false);
+          setWsError("");
           setGame({
             gameId: event.gameId,
             fen: event.fen,
@@ -150,7 +181,8 @@ export default function GameRoomPage() {
         }
 
         case "error": {
-          console.warn("[WS]", event.message);
+          setWsError(event.message);
+          setTimeout(() => setWsError((prev) => prev === event.message ? "" : prev), 6000);
           break;
         }
       }
@@ -159,9 +191,12 @@ export default function GameRoomPage() {
     socket.connect(guestId);
 
     return () => {
+      clearTimeout(connectTimeout);
+      unsubConn();
       unsubscribe();
       socket.disconnect();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, triggerAnalysis]);
 
   // Trigger analysis when game finishes
@@ -171,7 +206,6 @@ export default function GameRoomPage() {
     }
   }, [game?.status, game?.gameId, triggerAnalysis]);
 
-  // ── Move handler ─────────────────────────────────────────────
   const handleMove = useCallback(
     (from: string, to: string, promotion?: string): boolean => {
       if (!game || game.status !== "active") return false;
@@ -225,20 +259,43 @@ export default function GameRoomPage() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-full max-w-[min(90vw,560px)] h-8 bg-zinc-800 rounded animate-pulse" />
+            <div className="w-full max-w-[min(90vw,560px)] h-8 bg-surface-raised border border-surface-border animate-pulse" />
             <div
-              className="bg-zinc-800 rounded-lg animate-pulse"
+              className="bg-surface-raised border border-surface-border animate-pulse"
               style={{ width: "min(90vw, 560px)", aspectRatio: "1" }}
             />
-            <div className="w-full max-w-[min(90vw,560px)] h-8 bg-zinc-800 rounded animate-pulse" />
+            <div className="w-full max-w-[min(90vw,560px)] h-8 bg-surface-raised border border-surface-border animate-pulse" />
           </div>
           <div className="flex-1 space-y-3 pt-10">
-            <div className="h-6 bg-zinc-800 rounded animate-pulse w-1/2" />
-            <div className="h-32 bg-zinc-800 rounded animate-pulse" />
-            <div className="h-10 bg-zinc-800 rounded animate-pulse" />
+            <div className="h-6 bg-surface-raised border border-surface-border animate-pulse w-1/2" />
+            <div className="h-32 bg-surface-raised border border-surface-border animate-pulse" />
+            <div className="h-10 bg-surface-raised border border-surface-border animate-pulse" />
           </div>
         </div>
-        <p className="text-center text-zinc-500 text-sm mt-4 animate-pulse">Connecting&hellip;</p>
+        <p className="text-center text-phosphor-muted text-sm mt-4 animate-data-stream font-mono">
+          &gt; ESTABLISHING SECURE CONNECTION...
+        </p>
+        {connState === "reconnecting" && connDetail && (
+          <p className="text-center text-amber text-xs mt-2 font-mono">{connDetail}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Fatal connection error
+  if (wsError && !game) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <div className="panel border-danger/30 mb-6">
+          <p className="text-danger font-mono text-sm mb-1">[CONNECTION ERROR]</p>
+          <p className="text-phosphor-dim font-mono text-sm">{wsError}</p>
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          className="btn-primary"
+        >
+          &gt; RECONNECT
+        </button>
       </div>
     );
   }
@@ -247,10 +304,10 @@ export default function GameRoomPage() {
     <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
 
-        {/* ── Board column ──────────────────────────────────────── */}
+        {/* Board column */}
         <div className="flex flex-col items-center gap-3 w-full lg:w-auto">
           <PlayerBar
-            name="Opponent"
+            name="OPPONENT"
             color={orientation === "white" ? "black" : "white"}
             isActive={game?.status === "active" && !isMyTurn}
             connected={opponentConnected}
@@ -266,40 +323,51 @@ export default function GameRoomPage() {
           />
 
           <PlayerBar
-            name="You"
+            name="YOU"
             color={orientation}
             isActive={game?.status === "active" && !!isMyTurn}
-            connected
+            connected={connState === "connected" || connState === "connecting"}
           />
         </div>
 
-        {/* ── Sidebar ─────────────────────────────────────────── */}
+        {/* Sidebar */}
         <div className="w-full lg:flex-1 flex flex-col gap-3 lg:gap-4 min-w-0">
-          {/* Invite link — prominent card when waiting */}
+          {/* WS error banner */}
+          {wsError && game && (
+            <div className="panel border-danger/30 text-sm text-center font-mono">
+              <span className="text-danger">[ERROR]</span>{" "}
+              <span className="text-phosphor-dim">{wsError}</span>
+            </div>
+          )}
+
+          {/* Reconnecting banner */}
+          {connState === "reconnecting" && (
+            <div className="panel border-amber/30 text-sm text-center font-mono text-amber animate-data-stream">
+              {connDetail || "Reconnecting..."}
+            </div>
+          )}
+
+          {/* Invite link — prominent when waiting */}
           {!opponentConnected && game?.status === "waiting" && (
-            <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+            <div className="panel border-amber/30">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <p className="text-sm font-medium text-amber-400">
-                  Waiting for opponent
+                <div className="w-2 h-2 bg-amber animate-glow-pulse" />
+                <p className="text-sm font-mono text-amber">
+                  WAITING FOR OPPONENT
                 </p>
               </div>
-              <p className="text-xs text-zinc-400 mb-3">
-                Share this link with a friend to start playing:
+              <p className="text-xs text-phosphor-muted mb-3 font-mono">
+                // Share this link with a friend to start playing:
               </p>
               <div className="flex gap-2">
-                <code className="flex-1 text-xs bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg text-zinc-300 truncate">
+                <code className="flex-1 text-xs bg-surface px-2 py-1.5 text-phosphor-dim truncate break-all font-mono border border-surface-border">
                   {typeof window !== "undefined" ? window.location.href : ""}
                 </code>
                 <button
                   onClick={copyLink}
-                  className={`px-4 py-2 min-h-touch font-medium text-xs rounded-lg transition-all whitespace-nowrap ${
-                    copyDone
-                      ? "bg-emerald-500 text-black"
-                      : "bg-amber-500 hover:bg-amber-400 text-black"
-                  }`}
+                  className="btn-primary px-3 whitespace-nowrap text-xs"
                 >
-                  {copyDone ? "Copied!" : "Copy Link"}
+                  {copyDone ? "[COPIED]" : "[COPY]"}
                 </button>
               </div>
             </div>
@@ -307,28 +375,29 @@ export default function GameRoomPage() {
 
           {/* Status message (disconnect, game result) */}
           {statusMsg && game?.status !== "waiting" && (
-            <div className="p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 text-center">
-              {statusMsg}
+            <div className="panel border-phosphor/20 text-sm text-phosphor-dim text-center font-mono">
+              &gt; {statusMsg}
             </div>
           )}
 
           {/* Turn indicator */}
           {game?.status === "active" && (
             <div
-              className={`text-center text-sm font-medium px-3 py-2.5 rounded-lg transition-colors ${
+              className={`text-center text-sm font-mono px-3 py-2 ${
                 isMyTurn
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                  ? "panel border-amber/30 text-amber text-glow-amber"
+                  : "panel border-surface-border text-phosphor-muted"
               }`}
+              style={isMyTurn ? { boxShadow: "0 0 12px rgba(255,176,0,0.15)" } : {}}
             >
-              {isMyTurn ? "Your turn" : "Opponent's turn"}
+              {isMyTurn ? "> YOUR MOVE" : "> AWAITING OPPONENT"}
             </div>
           )}
 
           {/* Move list */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4">
-            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-              Moves
+          <div className="panel">
+            <h3 className="text-xs font-mono text-phosphor-muted uppercase tracking-wider mb-2">
+              // MOVE LOG
             </h3>
             <MoveList moves={game?.moves ?? []} />
           </div>
@@ -340,15 +409,15 @@ export default function GameRoomPage() {
                 onClick={requestHint}
                 disabled={hintsLeft <= 0}
                 title={`${hintsLeft} hints remaining`}
-                className="flex-1 py-2 min-h-touch bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+                className="btn-secondary flex-1"
               >
-                Hint ({hintsLeft})
+                [HINT] ({hintsLeft})
               </button>
               <button
                 onClick={resign}
-                className="flex-1 py-2 min-h-touch bg-zinc-800 hover:bg-red-900/40 border border-zinc-700 hover:border-red-700 rounded-lg text-sm text-zinc-300 hover:text-red-400 transition-colors"
+                className="btn-danger flex-1"
               >
-                Resign
+                [RESIGN]
               </button>
             </div>
           )}
@@ -360,15 +429,15 @@ export default function GameRoomPage() {
                 onClick={() => {
                   if (game.gameId) router.push(`/review/${game.gameId}`);
                 }}
-                className="py-2.5 min-h-touch bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg text-sm transition-colors"
+                className="btn-primary w-full text-center"
               >
-                Review Game &rarr;
+                &gt; ANALYZE GAME
               </button>
               <a
                 href="/play/new"
-                className="block text-center py-2.5 min-h-touch bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+                className="btn-secondary block text-center"
               >
-                New Game
+                &gt; NEW MISSION
               </a>
             </div>
           )}
@@ -379,14 +448,10 @@ export default function GameRoomPage() {
 }
 
 function formatResult(result?: string, reason?: string): string {
-  if (!result) return "Game over";
-  const winner = result === "draw" ? "Draw" : `${capitalize(result)} wins`;
-  const why = reason ? ` by ${reason.replace("_", " ")}` : "";
-  return winner + why;
-}
-
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  if (!result) return "GAME OVER";
+  const winner = result === "draw" ? "DRAW" : `${result.toUpperCase()} WINS`;
+  const why = reason ? ` [${reason.replace("_", " ").toUpperCase()}]` : "";
+  return `RESULT: ${winner}${why}`;
 }
 
 function PlayerBar({
@@ -395,16 +460,24 @@ function PlayerBar({
   name: string; color: string; isActive: boolean; connected?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 w-full" style={{ maxWidth: "min(90vw, 560px)" }}>
+    <div className="flex items-center gap-2 w-full font-mono" style={{ maxWidth: "min(90vw, 560px)" }}>
       <div
-        className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-          color === "white" ? "bg-zinc-100 border-zinc-400" : "bg-zinc-800 border-zinc-500"
+        className={`w-4 h-4 flex-shrink-0 border ${
+          color === "white"
+            ? "bg-phosphor-dim/30 border-phosphor/40"
+            : "bg-surface border-surface-border-bright"
         }`}
       />
-      <span className="text-sm font-medium text-zinc-300 truncate">{name}</span>
-      <div className="ml-auto flex items-center gap-1.5">
-        <span className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-500" : "bg-zinc-600"}`} />
-        {isActive && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+      <span className={`text-sm font-medium truncate uppercase ${
+        isActive ? "text-phosphor text-glow" : "text-phosphor-muted"
+      }`}>
+        {name}
+      </span>
+      <div className="ml-auto flex items-center gap-1.5 text-xs">
+        <span className={connected ? "text-phosphor" : "text-phosphor-muted/40"}>
+          {connected ? "[ONLINE]" : "[OFFLINE]"}
+        </span>
+        {isActive && <span className="w-2 h-2 bg-amber animate-glow-pulse" />}
       </div>
     </div>
   );

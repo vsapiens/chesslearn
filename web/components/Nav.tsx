@@ -4,21 +4,23 @@ import { useState } from "react";
 import Link from "next/link";
 
 const links = [
-  { href: "/play/new", label: "New Game" },
-  { href: "/learn", label: "Review & Learn" },
+  { href: "/play/new", label: "NEW GAME" },
+  { href: "/learn", label: "LEARN" },
 ];
 
 export function Nav() {
   const [open, setOpen] = useState(false);
 
   return (
-    <nav className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-4 sm:px-6 py-3">
+    <nav className="border-b border-surface-border-bright bg-surface-panel/90 backdrop-blur-sm px-4 sm:px-6 py-3"
+      style={{ boxShadow: "0 1px 12px rgba(0,255,65,0.06)" }}>
       <div className="flex items-center justify-between sm:justify-start sm:gap-6">
         <Link
           href="/"
-          className="text-lg font-bold text-amber-400 tracking-tight"
+          className="font-display text-lg font-bold text-phosphor text-glow tracking-wider"
         >
-          ChessLearn
+          CHESS://LEARN
+          <span className="inline-block w-2 h-4 bg-phosphor ml-1 animate-type-cursor align-middle" />
         </Link>
 
         {/* Desktop links */}
@@ -27,9 +29,9 @@ export function Nav() {
             <Link
               key={l.href}
               href={l.href}
-              className="text-sm text-zinc-300 hover:text-white transition-colors"
+              className="font-mono text-sm text-phosphor-muted hover:text-phosphor transition-colors uppercase tracking-wide"
             >
-              {l.label}
+              &gt; {l.label}
             </Link>
           ))}
         </div>
@@ -41,18 +43,18 @@ export function Nav() {
           aria-label="Toggle menu"
         >
           <span
-            className={`block w-5 h-0.5 bg-zinc-300 transition-transform ${
-              open ? "translate-y-[3px] rotate-45" : ""
+            className={`block w-5 h-0.5 bg-phosphor transition-transform ${
+              open ? "translate-y-[3px] rotate-45 shadow-phosphor" : ""
             }`}
           />
           <span
-            className={`block w-5 h-0.5 bg-zinc-300 mt-1 transition-opacity ${
+            className={`block w-5 h-0.5 bg-phosphor mt-1 transition-opacity ${
               open ? "opacity-0" : ""
             }`}
           />
           <span
-            className={`block w-5 h-0.5 bg-zinc-300 mt-1 transition-transform ${
-              open ? "-translate-y-[5px] -rotate-45" : ""
+            className={`block w-5 h-0.5 bg-phosphor mt-1 transition-transform ${
+              open ? "-translate-y-[5px] -rotate-45 shadow-phosphor" : ""
             }`}
           />
         </button>
@@ -60,15 +62,15 @@ export function Nav() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="sm:hidden mt-3 flex flex-col border-t border-zinc-800 pt-2">
+        <div className="sm:hidden mt-3 flex flex-col border-t border-surface-border pt-2">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="text-sm text-zinc-300 hover:text-white transition-colors py-3 min-h-touch flex items-center"
+              className="font-mono text-sm text-phosphor-muted hover:text-phosphor transition-colors py-3 min-h-touch flex items-center uppercase tracking-wide"
             >
-              {l.label}
+              &gt; {l.label}
             </Link>
           ))}
         </div>

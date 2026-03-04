@@ -3,7 +3,7 @@ import { Nav } from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChessLearn — Play Chess with Friends",
+  title: "ChessLearn // SYSTEM ONLINE",
   description:
     "Play chess with friends via a shareable link. No account needed. Real-time multiplayer with post-game analysis.",
 };
@@ -21,9 +21,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-zinc-950">
+      <body className="min-h-screen bg-surface crt-overlay crt-vignette grid-bg">
         <Nav />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 animate-crt-on">{children}</main>
       </body>
     </html>
   );

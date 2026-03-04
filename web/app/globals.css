@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,8 +9,8 @@
 }
 
 body {
-  @apply bg-zinc-950 text-zinc-100 antialiased;
-  font-family: system-ui, -apple-system, sans-serif;
+  @apply bg-surface text-phosphor-dim antialiased;
+  font-family: "Share Tech Mono", monospace;
 }
 
 button, a, [role="button"] {
@@ -19,13 +21,135 @@ button, a, [role="button"] {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Chess board scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { @apply bg-zinc-900; }
-::-webkit-scrollbar-thumb { @apply bg-zinc-700 rounded; }
-
-.move-item {
-  @apply cursor-pointer rounded px-1 py-0.5 text-sm transition-colors;
+/* ── CRT Scanline Overlay ──────────────────────────── */
+.crt-overlay::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.08) 0px,
+    rgba(0, 0, 0, 0.08) 1px,
+    transparent 1px,
+    transparent 3px
+  );
 }
-.move-item:hover { @apply bg-zinc-700; }
-.move-item.active { @apply bg-amber-600 text-white; }
+
+/* ── CRT Vignette ──────────────────────────────────── */
+.crt-vignette::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0, 0, 0, 0.45) 100%
+  );
+}
+
+/* ── Grid Background ───────────────────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Text Glow Utilities ───────────────────────────── */
+.text-glow {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.6), 0 0 16px rgba(0, 255, 65, 0.3);
+}
+.text-glow-amber {
+  text-shadow: 0 0 8px rgba(255, 176, 0, 0.6), 0 0 16px rgba(255, 176, 0, 0.3);
+}
+.text-glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6), 0 0 16px rgba(0, 229, 255, 0.3);
+}
+.text-glow-danger {
+  text-shadow: 0 0 8px rgba(255, 51, 51, 0.6), 0 0 16px rgba(255, 51, 51, 0.3);
+}
+
+/* ── Panel / Card ──────────────────────────────────── */
+.panel {
+  @apply bg-surface-panel border border-surface-border p-3 sm:p-4;
+}
+.panel-glow {
+  @apply panel;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.08), inset 0 0 20px rgba(0, 255, 65, 0.02);
+}
+
+/* ── Buttons ───────────────────────────────────────── */
+.btn-primary {
+  @apply px-5 py-2.5 min-h-touch border border-phosphor/40 text-phosphor font-mono text-sm transition-all;
+  background: rgba(0, 255, 65, 0.08);
+}
+.btn-primary:hover {
+  @apply border-phosphor/70;
+  background: rgba(0, 255, 65, 0.15);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.2);
+}
+.btn-primary:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply px-5 py-2.5 min-h-touch border border-surface-border-bright text-phosphor-dim font-mono text-sm transition-all;
+  background: rgba(0, 255, 65, 0.04);
+}
+.btn-secondary:hover {
+  @apply border-phosphor/40 text-phosphor;
+  background: rgba(0, 255, 65, 0.08);
+}
+
+.btn-danger {
+  @apply px-5 py-2.5 min-h-touch border border-danger/30 text-danger font-mono text-sm transition-all;
+  background: rgba(255, 51, 51, 0.08);
+}
+.btn-danger:hover {
+  @apply border-danger/60;
+  background: rgba(255, 51, 51, 0.15);
+  box-shadow: 0 0 12px rgba(255, 51, 51, 0.2);
+}
+
+/* ── Option Buttons (radio-style selection) ────────── */
+.option-btn {
+  @apply py-3 min-h-touch border border-surface-border-bright text-phosphor-muted font-mono text-sm transition-all;
+  background: rgba(0, 255, 65, 0.03);
+}
+.option-btn:hover {
+  @apply border-phosphor/30 text-phosphor-dim;
+}
+.option-btn.selected {
+  @apply border-phosphor/60 text-phosphor;
+  background: rgba(0, 255, 65, 0.12);
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.15);
+}
+
+/* ── Move List Items ───────────────────────────────── */
+.move-item {
+  @apply cursor-pointer px-1 py-0.5 text-sm transition-colors text-phosphor-dim;
+}
+.move-item:hover {
+  background: rgba(0, 255, 65, 0.08);
+}
+.move-item.active {
+  @apply text-amber;
+  background: rgba(255, 176, 0, 0.15);
+}
+
+/* ── Review Category Badges ────────────────────────── */
+.cat-blunder { @apply text-danger border-danger/40; background: rgba(255, 51, 51, 0.12); }
+.cat-mistake { @apply text-amber border-amber/40; background: rgba(255, 176, 0, 0.12); }
+.cat-inaccuracy { @apply text-amber-dim border-amber/30; background: rgba(255, 176, 0, 0.08); }
+.cat-good { @apply text-phosphor border-phosphor/40; background: rgba(0, 255, 65, 0.12); }
+.cat-best { @apply text-cyan border-cyan/40; background: rgba(0, 229, 255, 0.12); }
+
+/* ── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: rgba(0, 255, 65, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 255, 65, 0.35); }
