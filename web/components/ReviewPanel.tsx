@@ -2,20 +2,20 @@
 
 import { ReviewPosition } from "@/lib/api";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  blunder: "text-red-400 bg-red-900/30 border-red-800",
-  mistake: "text-orange-400 bg-orange-900/30 border-orange-800",
-  inaccuracy: "text-yellow-400 bg-yellow-900/30 border-yellow-800",
-  good: "text-emerald-400 bg-emerald-900/30 border-emerald-800",
-  best: "text-sky-400 bg-sky-900/30 border-sky-800",
+const CATEGORY_CLASSES: Record<string, string> = {
+  blunder: "cat-blunder",
+  mistake: "cat-mistake",
+  inaccuracy: "cat-inaccuracy",
+  good: "cat-good",
+  best: "cat-best",
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
-  blunder: "??",
-  mistake: "?",
-  inaccuracy: "?!",
-  good: "!",
-  best: "!!",
+  blunder: "[!!]",
+  mistake: "[!]",
+  inaccuracy: "[?!]",
+  good: "[OK]",
+  best: "[++]",
 };
 
 interface Props {
@@ -41,47 +41,48 @@ export function ReviewPanel({
 
   return (
     <div className="space-y-5">
-      {/* Summary stats */}
+      {/* Summary */}
       {summary && (
-        <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 text-sm text-zinc-300">
-          {summary}
+        <div className="panel text-sm text-phosphor-dim">
+          <span className="text-phosphor-muted">&gt; </span>{summary}
         </div>
       )}
 
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-2 text-center">
-        <StatBox label="Blunders" value={blunders} color="text-red-400" />
-        <StatBox label="Mistakes" value={mistakes} color="text-orange-400" />
-        <StatBox label="Inaccuracies" value={inaccuracies} color="text-yellow-400" />
+        <StatBox label="Blunders" value={blunders} cat="blunder" />
+        <StatBox label="Mistakes" value={mistakes} cat="mistake" />
+        <StatBox label="Inaccuracies" value={inaccuracies} cat="inaccuracy" />
       </div>
 
       {/* Key moments */}
       {keyMoments.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-            Key Moments
+          <h3 className="text-sm font-mono text-phosphor-muted uppercase tracking-wider mb-2">
+            // CRITICAL ALERTS
           </h3>
           <div className="space-y-2">
             {keyMoments.map((pos) => {
               const moveNum = Math.ceil(pos.ply / 2);
               const isWhite = pos.ply % 2 === 1;
               const cat = pos.category ?? "good";
-              const colors = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.good;
+              const catClass = CATEGORY_CLASSES[cat] ?? CATEGORY_CLASSES.good;
               const icon = CATEGORY_ICONS[cat] ?? "";
 
               return (
                 <button
                   key={pos.id}
-                  className={`w-full text-left p-3 rounded-lg border text-sm transition-all ${colors} ${
-                    currentPly === pos.ply ? "ring-1 ring-white/20" : ""
+                  className={`w-full text-left p-3 border text-sm transition-all ${catClass} ${
+                    currentPly === pos.ply ? "ring-1 ring-phosphor/30" : ""
                   }`}
                   onClick={() => onSelectPly?.(pos.ply)}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold">
+                    <span className="font-mono font-semibold">
                       {moveNum}.{isWhite ? "" : ".."} {pos.playedMoveSan}{" "}
                       <span className="opacity-70">{icon}</span>
                     </span>
-                    <span className="text-xs uppercase opacity-70">{cat}</span>
+                    <span className="text-xs uppercase opacity-70 font-mono">{cat}</span>
                   </div>
                   {pos.explanation && (
                     <p className="text-xs opacity-80 leading-relaxed">
@@ -89,7 +90,7 @@ export function ReviewPanel({
                     </p>
                   )}
                   {pos.bestMoveUci && cat !== "best" && cat !== "good" && (
-                    <p className="text-xs mt-1 opacity-60">
+                    <p className="text-xs mt-1 opacity-60 font-mono">
                       Best: <code>{pos.bestMoveUci}</code>
                     </p>
                   )}
@@ -102,8 +103,8 @@ export function ReviewPanel({
 
       {/* Full move classification list */}
       <div>
-        <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          All Moves
+        <h3 className="text-sm font-mono text-phosphor-muted uppercase tracking-wider mb-2">
+          // FULL MOVE LOG
         </h3>
         <div className="space-y-0.5 max-h-48 overflow-y-auto pr-1">
           {positions.map((pos) => {
@@ -111,31 +112,34 @@ export function ReviewPanel({
             const isWhite = pos.ply % 2 === 1;
             const cat = pos.category ?? "good";
             const icon = CATEGORY_ICONS[cat] ?? "";
+            const catTextColor = {
+              blunder: "text-danger",
+              mistake: "text-amber",
+              inaccuracy: "text-amber-dim",
+              good: "text-phosphor",
+              best: "text-cyan",
+            }[cat] ?? "text-phosphor-muted";
             const evalStr =
               pos.evalAfter !== undefined
                 ? (pos.evalAfter / 100).toFixed(2)
-                : "–";
+                : "\u2013";
 
             return (
               <button
                 key={pos.id}
                 onClick={() => onSelectPly?.(pos.ply)}
-                className={`w-full flex items-center gap-2 px-2 py-2 sm:py-1 min-h-[36px] rounded text-xs transition-all hover:bg-zinc-800 ${
-                  currentPly === pos.ply ? "bg-zinc-700" : ""
+                className={`w-full flex items-center gap-2 px-2 py-2 sm:py-1 min-h-[36px] text-xs transition-all hover:bg-phosphor-glow10 font-mono ${
+                  currentPly === pos.ply ? "bg-phosphor-glow10" : ""
                 }`}
               >
-                <span className="text-zinc-600 w-8 text-right">
+                <span className="text-phosphor-muted/50 w-8 text-right">
                   {moveNum}.{isWhite ? "" : ".."}
                 </span>
-                <span className="font-medium text-zinc-200 w-12">{pos.playedMoveSan}</span>
-                <span
-                  className={`w-6 font-bold ${
-                    CATEGORY_COLORS[cat]?.split(" ")[0] ?? "text-zinc-400"
-                  }`}
-                >
+                <span className="font-medium text-phosphor-dim w-12">{pos.playedMoveSan}</span>
+                <span className={`w-8 font-bold ${catTextColor}`}>
                   {icon}
                 </span>
-                <span className="text-zinc-500 ml-auto">{evalStr}</span>
+                <span className="text-phosphor-muted/50 ml-auto">{evalStr}</span>
               </button>
             );
           })}
@@ -148,16 +152,27 @@ export function ReviewPanel({
 function StatBox({
   label,
   value,
-  color,
+  cat,
 }: {
   label: string;
   value: number;
-  color: string;
+  cat: string;
 }) {
+  const glowMap: Record<string, string> = {
+    blunder: "shadow-danger",
+    mistake: "shadow-amber",
+    inaccuracy: "shadow-amber",
+  };
+  const colorMap: Record<string, string> = {
+    blunder: "text-danger",
+    mistake: "text-amber",
+    inaccuracy: "text-amber-dim",
+  };
+
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-3">
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-zinc-500">{label}</div>
+    <div className={`panel ${glowMap[cat] ?? ""}`}>
+      <div className={`text-2xl font-display font-bold ${colorMap[cat] ?? "text-phosphor"}`}>{value}</div>
+      <div className="text-xs text-phosphor-muted font-mono">{label}</div>
     </div>
   );
 }

@@ -23,13 +23,12 @@ export function MoveList({ moves, currentPly, onSelectPly }: Props) {
 
   if (moves.length === 0) {
     return (
-      <div className="text-zinc-500 text-sm text-center py-4">
-        No moves yet
+      <div className="text-phosphor-muted text-sm text-center py-4 font-mono">
+        &gt; AWAITING FIRST MOVE...
       </div>
     );
   }
 
-  // Group into pairs (white move + black move per row)
   const rows: Array<{ moveNum: number; white?: Move; black?: Move }> = [];
   for (let i = 0; i < moves.length; i += 2) {
     const moveNum = Math.floor(moves[i].ply / 2) + 1;
@@ -44,7 +43,7 @@ export function MoveList({ moves, currentPly, onSelectPly }: Props) {
     <div className="font-mono text-sm overflow-y-auto max-h-48 sm:max-h-64 pr-1">
       {rows.map((row) => (
         <div key={row.moveNum} className="flex items-center gap-1 py-0.5">
-          <span className="text-zinc-600 w-7 text-right select-none">
+          <span className="text-phosphor-muted/40 w-7 text-right select-none text-[10px]">
             {row.moveNum}.
           </span>
 

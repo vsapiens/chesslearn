@@ -1,11 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-export default function NewGamePage() {
+/** Suspense boundary required by Next.js for useSearchParams(). */
+export default function NewGamePageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-16">
+          <div className="h-8 bg-surface-raised border border-surface-border animate-pulse mb-4 w-48" />
+          <div className="h-4 bg-surface-raised border border-surface-border animate-pulse mb-8 w-72" />
+          <div className="space-y-6">
+            <div className="h-20 bg-surface-raised border border-surface-border animate-pulse" />
+            <div className="h-20 bg-surface-raised border border-surface-border animate-pulse" />
+            <div className="h-12 bg-surface-raised border border-surface-border animate-pulse" />
+          </div>
+        </div>
+      }
+    >
+      <NewGamePage />
+    </Suspense>
+  );
+}
+
+function NewGamePage() {
   const params = useSearchParams();
   const router = useRouter();
 
@@ -33,61 +54,76 @@ export default function NewGamePage() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create game");
+      if (!res.ok) {
+        // Try to extract server error detail
+        let detail = "";
+        try {
+          const body = await res.json();
+          detail = body.error || body.message || "";
+        } catch {
+          // not JSON
+        }
+        throw new Error(
+          detail || `Server returned ${res.status}. Please try again.`
+        );
+      }
 
       const data = await res.json();
       router.push(`/g/${data.token}`);
     } catch (e: any) {
-      setError(e.message ?? "Something went wrong");
+      if (e instanceof TypeError && e.message === "Failed to fetch") {
+        setError("Cannot reach the server. Check your connection and try again.");
+      } else {
+        setError(e.message ?? "Something went wrong. Please try again.");
+      }
       setLoading(false);
     }
   }
 
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-8 sm:py-16">
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">New Game</h1>
-      <p className="text-zinc-400 mb-8">Configure your game settings below.</p>
+      <h1 className="font-display text-2xl sm:text-3xl font-bold text-phosphor text-glow mb-2">
+        NEW MISSION
+      </h1>
+      <p className="text-phosphor-muted mb-8 font-mono text-sm">
+        &gt; Configure parameters below. Press EXECUTE when ready.
+      </p>
 
       {/* Mode selection */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Game Mode
+        <label className="block text-sm font-mono text-phosphor-muted mb-2">
+          //&gt; Game Mode
         </label>
         <div className="grid grid-cols-2 gap-3">
-          {(["human", "bot"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`py-3 min-h-touch rounded-lg border text-sm font-medium transition-all ${
-                mode === m
-                  ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              {m === "human" ? "🔗 vs Friend (Link)" : "🤖 vs Bot"}
-            </button>
-          ))}
+          <button
+            onClick={() => setMode("human")}
+            className={`option-btn ${mode === "human" ? "selected" : ""}`}
+          >
+            [LINK] VS FRIEND
+          </button>
+          <button
+            onClick={() => setMode("bot")}
+            className={`option-btn ${mode === "bot" ? "selected" : ""}`}
+          >
+            [BOT] VS ENGINE
+          </button>
         </div>
       </div>
 
       {/* Bot difficulty */}
       {mode === "bot" && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Bot Difficulty
+          <label className="block text-sm font-mono text-phosphor-muted mb-2">
+            //&gt; Difficulty
           </label>
           <div className="grid grid-cols-3 gap-3">
             {(["easy", "medium", "hard"] as const).map((d) => (
               <button
                 key={d}
                 onClick={() => setBotDifficulty(d)}
-                className={`py-2 rounded-lg border text-sm font-medium transition-all ${
-                  botDifficulty === d
-                    ? "border-sky-400 bg-sky-400/10 text-sky-400"
-                    : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-                }`}
+                className={`option-btn ${botDifficulty === d ? "selected" : ""}`}
               >
-                {d.charAt(0).toUpperCase() + d.slice(1)}
+                {d.toUpperCase()}
               </button>
             ))}
           </div>
@@ -96,60 +132,62 @@ export default function NewGamePage() {
 
       {/* Color preference */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Play as
+        <label className="block text-sm font-mono text-phosphor-muted mb-2">
+          //&gt; Play as
         </label>
         <div className="grid grid-cols-3 gap-3">
-          {(["white", "random", "black"] as const).map((c) => (
-            <button
-              key={c}
-              onClick={() => setColorPref(c)}
-              className={`py-2 rounded-lg border text-sm font-medium transition-all ${
-                colorPref === c
-                  ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              {c === "white" ? "⬜ White" : c === "black" ? "⬛ Black" : "🎲 Random"}
-            </button>
-          ))}
+          <button
+            onClick={() => setColorPref("white")}
+            className={`option-btn ${colorPref === "white" ? "selected" : ""}`}
+          >
+            [W] WHITE
+          </button>
+          <button
+            onClick={() => setColorPref("random")}
+            className={`option-btn ${colorPref === "random" ? "selected" : ""}`}
+          >
+            [?] RANDOM
+          </button>
+          <button
+            onClick={() => setColorPref("black")}
+            className={`option-btn ${colorPref === "black" ? "selected" : ""}`}
+          >
+            [B] BLACK
+          </button>
         </div>
       </div>
 
-      {/* Time control (optional) */}
+      {/* Time control */}
       <div className="mb-8">
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Time Control <span className="text-zinc-500">(optional)</span>
+        <label className="block text-sm font-mono text-phosphor-muted mb-2">
+          //&gt; Time Control <span className="text-phosphor-muted/50">(optional)</span>
         </label>
         <div className="flex gap-2 flex-wrap">
           {["", "3+0", "5+0", "10+0"].map((tc) => (
             <button
               key={tc || "none"}
               onClick={() => setTimeControl(tc)}
-              className={`px-4 py-2 min-h-touch rounded border text-sm transition-all ${
-                timeControl === tc
-                  ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                  : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
+              className={`option-btn px-4 ${timeControl === tc ? "selected" : ""}`}
             >
-              {tc || "None"}
+              {tc || "NONE"}
             </button>
           ))}
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded text-red-400 text-sm">
-          {error}
+        <div className="mb-4 p-3 border border-danger/30 text-danger text-sm font-mono"
+          style={{ background: "rgba(255,51,51,0.08)" }}>
+          [ERROR] {error}
         </div>
       )}
 
       <button
         onClick={createGame}
         disabled={loading}
-        className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-lg transition-colors"
+        className="btn-primary w-full text-center"
       >
-        {loading ? "Creating game…" : "Create Game"}
+        {loading ? "INITIALIZING..." : "> EXECUTE"}
       </button>
     </div>
   );

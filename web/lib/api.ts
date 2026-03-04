@@ -41,9 +41,38 @@ export interface ReviewPosition {
   explanation?: string;
 }
 
+/** Extract a human-readable error from a failed fetch response. */
+async function extractError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.text();
+    // Try to parse as JSON for a server error message
+    try {
+      const json = JSON.parse(body);
+      if (json.error) return json.error;
+      if (json.message) return json.message;
+    } catch {
+      // Not JSON — use raw text if short enough
+      if (body.length > 0 && body.length < 200) return body;
+    }
+  } catch {
+    // Could not read body
+  }
+  return `${fallback} (HTTP ${res.status})`;
+}
+
 export async function getGame(token: string): Promise<GameResponse> {
-  const res = await fetch(`${API}/api/games/${token}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Game not found");
+  let res: Response;
+  try {
+    res = await fetch(`${API}/api/games/${token}`, { cache: "no-store" });
+  } catch (err) {
+    throw new Error("Network error — cannot reach the server. Check your connection.");
+  }
+  if (!res.ok) {
+    const msg = res.status === 404
+      ? "Game not found. It may have expired or the link is invalid."
+      : await extractError(res, "Failed to load game");
+    throw new Error(msg);
+  }
   return res.json();
 }
 
@@ -53,21 +82,44 @@ export async function createGame(body: {
   colorPreference?: string;
   timeControl?: string;
 }): Promise<{ gameId: string; token: string; inviteUrl: string; playerColor?: string }> {
-  const res = await fetch(`${API}/api/games`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("Failed to create game");
+  let res: Response;
+  try {
+    res = await fetch(`${API}/api/games`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    throw new Error("Network error — cannot reach the server. Check your connection.");
+  }
+  if (!res.ok) {
+    throw new Error(await extractError(res, "Failed to create game"));
+  }
   return res.json();
 }
 
 export async function triggerAnalysis(gameId: string): Promise<AnalysisResponse> {
-  const res = await fetch(`${API}/api/analysis/${gameId}`, { method: "POST" });
+  let res: Response;
+  try {
+    res = await fetch(`${API}/api/analysis/${gameId}`, { method: "POST" });
+  } catch (err) {
+    throw new Error("Network error — cannot reach the analysis server.");
+  }
+  if (!res.ok) {
+    throw new Error(await extractError(res, "Failed to trigger analysis"));
+  }
   return res.json();
 }
 
 export async function getAnalysis(gameId: string): Promise<AnalysisResponse> {
-  const res = await fetch(`${API}/api/analysis/${gameId}`, { cache: "no-store" });
+  let res: Response;
+  try {
+    res = await fetch(`${API}/api/analysis/${gameId}`, { cache: "no-store" });
+  } catch (err) {
+    throw new Error("Network error — cannot reach the analysis server.");
+  }
+  if (!res.ok) {
+    throw new Error(await extractError(res, "Failed to fetch analysis"));
+  }
   return res.json();
 }
