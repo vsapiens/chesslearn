@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Game {
@@ -26,24 +27,29 @@ model Game {
   updatedAt     DateTime @updatedAt
   moves         Move[]
   review        Review?
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Move {
   id        String   @id @default(cuid())
   gameId    String
-  game      Game     @relation(fields: [gameId], references: [id])
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   ply       Int
   san       String
   uci       String
   fenAfter  String
   clockMs   Int?
   createdAt DateTime @default(now())
+
+  @@index([gameId])
 }
 
 model Review {
   id              String           @id @default(cuid())
   gameId          String           @unique
-  game            Game             @relation(fields: [gameId], references: [id])
+  game            Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
   analysisVersion String           @default("1")
   summary         String?
   accuracy        Float?
@@ -54,7 +60,7 @@ model Review {
 model ReviewPosition {
   id            String  @id @default(cuid())
   reviewId      String
-  review        Review  @relation(fields: [reviewId], references: [id])
+  review        Review  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   gameId        String
   ply           Int
   fen           String
@@ -65,4 +71,7 @@ model ReviewPosition {
   playedMoveUci String?
   playedMoveSan String?
   explanation   String?
+
+  @@index([reviewId])
+  @@index([gameId])
 }

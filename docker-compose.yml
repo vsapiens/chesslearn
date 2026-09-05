@@ -4,12 +4,11 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - DATABASE_URL=file:/data/chess.db
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
       - PORT=3001
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - MAX_HINTS_PER_GAME=${MAX_HINTS_PER_GAME:-3}
-    volumes:
-      - chess-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
@@ -29,6 +28,3 @@ services:
       server:
         condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  chess-data:

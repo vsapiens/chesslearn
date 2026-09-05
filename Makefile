@@ -1,4 +1,4 @@
-.PHONY: dev build up down logs db-push clean prod
+.PHONY: dev build up down logs db-push db-migrate clean prod
 
 dev:
 	docker compose up --build
@@ -16,7 +16,10 @@ logs:
 	docker compose logs -f
 
 db-push:
-	docker compose exec server npx prisma db push
+	cd server && npx prisma db push
+
+db-migrate:
+	cd server && npx prisma migrate dev
 
 clean:
 	docker compose down -v

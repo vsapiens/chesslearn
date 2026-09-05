@@ -1,4 +1,5 @@
 FROM node:20-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -9,7 +10,7 @@ RUN npm run build
 
 FROM node:20-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends stockfish curl \
+    && apt-get install -y --no-install-recommends stockfish curl openssl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/dist ./dist
