@@ -2,6 +2,10 @@
 
 Play chess against friends (link invite) or bots — with post-game engine analysis powered by Stockfish.
 
+## Overview
+
+ChessLearn is a self-hosted multiplayer chess platform built with Fastify and Next.js. It pairs real-time WebSocket gameplay with Stockfish-powered analysis so players can review their mistakes and improve after every game.
+
 ## Features
 
 - **Multiplayer** — Create a game and share the link. WebSocket-based real-time play.
@@ -86,6 +90,26 @@ Open [http://localhost:3000](http://localhost:3000)
 chmod +x start-dev.sh
 ./start-dev.sh
 ```
+
+## Environment Variables
+
+### Server (`server/.env`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | Prisma datasource URL for SQLite | `file:./dev.db` |
+| `PORT` | HTTP/WebSocket server port | `3001` |
+| `FRONTEND_URL` | Allowed CORS origin for the web client | `http://localhost:3000` |
+| `MAX_HINTS_PER_GAME` | Engine hints each player can request per game | `3` |
+
+### Web (`web/.env.local`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_API_URL` | Base URL for REST API calls | `http://localhost:3001` |
+| `NEXT_PUBLIC_WS_URL` | Base URL for WebSocket connections | `ws://localhost:3001` |
+
+> **Production note:** `NEXT_PUBLIC_*` variables are baked into the Next.js bundle at build time. See `.env.production.example` for production values (HTTPS/WSS URLs pointing to your domain).
 
 ## WebSocket Protocol
 
